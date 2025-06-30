@@ -145,7 +145,14 @@ const defaultConfigData = {
           }
         }
       }
-    ]
+    ],
+    'enclosures': [],
+    'storage': [],
+    'middleware': [],
+    'licensing': [],
+    'installation': [],
+    'support': [],
+    'training': []
   }
 };
 
@@ -539,29 +546,6 @@ const InfrastructureConfigurator = () => {
           </div>
 
           <div className="border rounded-lg p-6 bg-gray-50">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-lg font-semibold">{selection.product.name}</h3>
-                <p className="text-sm text-gray-600 mt-1">{selection.product.description}</p>
-              </div>
-              <button
-                onClick={() => removeSelection(selectedProductIndex)}
-                className="px-4 py-2 text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors"
-              >
-                Remove Product
-              </button>
-            </div>
-            
-            <div className="mb-6 p-4 bg-white rounded border">
-              <label className="block text-sm font-medium mb-2">Quantity</label>
-              <input
-                type="number"
-                min="1"
-                value={selection.quantity}
-                onChange={(e) => updateSelection(selectedProductIndex, { quantity: parseInt(e.target.value) || 1 })}
-                className="w-32 p-3 border rounded focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
 
             <div className="space-y-6">
               {Object.entries(selection.product.modules || {}).map(([moduleId, module]) => (
@@ -802,43 +786,50 @@ const InfrastructureConfigurator = () => {
           <h3 className="text-lg font-semibold mb-4">
             {currentSelections.length > 0 ? 'Add More Products' : 'Available Products'}
           </h3>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {availableProducts.map(product => (
-              <div key={product.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow bg-white">
-                <h4 className="font-medium text-gray-900">{product.name}</h4>
-                <p className="text-sm text-gray-600 mt-1 mb-3">{product.description}</p>
-                
-                <div className="text-xs text-gray-500 mb-3">
-                  <div className="font-medium mb-1">Default Configuration:</div>
-                  <div className="space-y-1">
-                    {Object.entries(product.modules || {}).map(([moduleId, module]) => {
-                      if (module.type === 'single-select' && module.defaultSelection) {
-                        const defaultOption = module.options.find(opt => opt.id === module.defaultSelection);
-                        return (
-                          <div key={moduleId} className="text-xs">
-                            <span className="font-medium">{module.label}:</span> {defaultOption?.label}
-                          </div>
-                        );
-                      }
-                      return null;
-                    })}
+          {availableProducts.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {availableProducts.map(product => (
+                <div key={product.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow bg-white">
+                  <h4 className="font-medium text-gray-900">{product.name}</h4>
+                  <p className="text-sm text-gray-600 mt-1 mb-3">{product.description}</p>
+                  
+                  <div className="text-xs text-gray-500 mb-3">
+                    <div className="font-medium mb-1">Default Configuration:</div>
+                    <div className="space-y-1">
+                      {Object.entries(product.modules || {}).map(([moduleId, module]) => {
+                        if (module.type === 'single-select' && module.defaultSelection) {
+                          const defaultOption = module.options.find(opt => opt.id === module.defaultSelection);
+                          return (
+                            <div key={moduleId} className="text-xs">
+                              <span className="font-medium">{module.label}:</span> {defaultOption?.label}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-semibold text-green-600">
+                      From ${product.basePrice.toLocaleString()}
+                    </span>
+                    <button
+                      onClick={() => addProduct(product)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    >
+                      Add
+                    </button>
                   </div>
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-lg font-semibold text-green-600">
-                    From ${product.basePrice.toLocaleString()}
-                  </span>
-                  <button
-                    onClick={() => addProduct(product)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p>No products available for this category yet.</p>
+              <p className="text-sm mt-1">Configure your system using the upload feature or contact support.</p>
+            </div>
+          )}
         </div>
       </div>
     );
