@@ -5,11 +5,6 @@ import {
   X, 
   ChevronRight, 
   Settings, 
-  Shield, 
-  Users, 
-  Eye, 
-  EyeOff, 
-  MessageSquare, 
   ChevronDown, 
   ChevronUp, 
   Minus, 
@@ -50,8 +45,7 @@ const AIConfigurationAssistant = ({
     'web application': {
       response: "For a web application, I recommend starting with our Enterprise Node A with 16-Core CPU + 64GB RAM for better performance. You'll also want SSD storage for faster response times. Would you like me to configure this for you?",
       suggestion: {
-        category: 'hardware',
-        subItem: 'server-nodes',
+        category: 'node',
         productId: 'node-a',
         config: {
           compute: 'cpu-16core-64gb',
@@ -62,8 +56,7 @@ const AIConfigurationAssistant = ({
     'database': {
       response: "For database workloads, I recommend prioritizing storage performance and memory. The 16-Core CPU with 64GB RAM is ideal, and I suggest multiple NVMe SSDs for your database files. Shall I set this up?",
       suggestion: {
-        category: 'hardware',
-        subItem: 'server-nodes',
+        category: 'node',
         productId: 'node-a',
         config: {
           compute: 'cpu-16core-64gb',
@@ -74,35 +67,11 @@ const AIConfigurationAssistant = ({
     'budget': {
       response: "I can help you optimize for cost! The standard 8-Core CPU with 32GB RAM provides excellent value, and you can start with basic storage and scale up later. This configuration starts at $1,650. Want me to configure this budget-friendly option?",
       suggestion: {
-        category: 'hardware',
-        subItem: 'server-nodes',
+        category: 'node',
         productId: 'node-a',
         config: {
           compute: 'cpu-8core-32gb',
           storage: [{ optionId: 'ssd-500gb', quantity: 1 }]
-        }
-      }
-    },
-    'performance': {
-      response: "For maximum performance, I recommend the 16-Core CPU with 64GB RAM, multiple NVMe SSDs, and upgrading to the Advanced Linux edition for better support. This gives you the best performance available.",
-      suggestion: {
-        category: 'hardware',
-        subItem: 'server-nodes',
-        productId: 'node-a',
-        config: {
-          compute: 'cpu-16core-64gb',
-          storage: [{ optionId: 'ssd-500gb', quantity: 4 }]
-        }
-      }
-    },
-    'linux': {
-      response: "For Linux systems, I recommend our Enterprise Linux with Advanced Edition for better support and extended packages. The Standard Edition is great for basic needs, but Advanced gives you premium support.",
-      suggestion: {
-        category: 'software',
-        subItem: 'operating-system',
-        productId: 'enterprise-linux',
-        config: {
-          edition: 'advanced'
         }
       }
     }
@@ -119,35 +88,20 @@ const AIConfigurationAssistant = ({
   const getAIResponse = (userMessage) => {
     const lowerMessage = userMessage.toLowerCase();
     
-    // Find matching keywords and return appropriate response
     for (const [keyword, data] of Object.entries(mockAIResponses)) {
       if (lowerMessage.includes(keyword)) {
         return data;
       }
     }
     
-    // Default responses for common patterns
-    if (lowerMessage.includes('help') || lowerMessage.includes('what can you do')) {
+    if (lowerMessage.includes('help')) {
       return {
-        response: "I can help you with: 🔧 Product recommendations based on your needs, 💰 Budget optimization, ⚡ Performance tuning, 🛠️ Configuration setup, 📊 Workload analysis. Just describe what you're building!"
+        response: "I can help you with product recommendations, budget optimization, performance tuning, and configuration setup. Just describe what you're building!"
       };
     }
     
-    if (lowerMessage.includes('price') || lowerMessage.includes('cost')) {
-      return {
-        response: "I can help you optimize costs! Our configurations start at $1,650 for basic setups. Tell me about your requirements and budget, and I'll find the best value options for you."
-      };
-    }
-    
-    if (lowerMessage.includes('recommendation') || lowerMessage.includes('suggest')) {
-      return {
-        response: "I'd be happy to make recommendations! Could you tell me more about: 1️⃣ What type of application you're building, 2️⃣ Expected number of users, 3️⃣ Your budget range, 4️⃣ Any specific performance requirements?"
-      };
-    }
-    
-    // Default response
     return {
-      response: "I understand you're asking about your infrastructure setup. Could you provide more details about your specific needs? For example, are you building a web application, database server, or something else? I can provide better recommendations with more context!"
+      response: "I understand you're asking about your infrastructure setup. Could you provide more details about your specific needs?"
     };
   };
 
@@ -165,7 +119,6 @@ const AIConfigurationAssistant = ({
     setInputMessage('');
     setIsTyping(true);
 
-    // Simulate AI thinking time
     setTimeout(() => {
       const aiResponse = getAIResponse(inputMessage);
       
@@ -179,14 +132,13 @@ const AIConfigurationAssistant = ({
 
       setMessages(prev => [...prev, assistantMessage]);
       setIsTyping(false);
-    }, 1000 + Math.random() * 1000); // Random delay 1-2 seconds
+    }, 1000);
   };
 
   const handleApplySuggestion = (suggestion) => {
     if (onApplyConfiguration && suggestion) {
       onApplyConfiguration(suggestion);
       
-      // Add confirmation message
       const confirmMessage = {
         id: Date.now(),
         type: 'assistant',
@@ -196,9 +148,8 @@ const AIConfigurationAssistant = ({
       
       setMessages(prev => [...prev, confirmMessage]);
       
-      // Navigate to the relevant step
       if (onNavigateToStep) {
-        onNavigateToStep(suggestion.category, suggestion.subItem);
+        onNavigateToStep(suggestion.category);
       }
     }
   };
@@ -225,7 +176,6 @@ const AIConfigurationAssistant = ({
     <div className={`fixed bottom-6 right-6 bg-white rounded-lg shadow-xl border border-gray-200 z-50 transition-all duration-300 ${
       isExpanded ? 'w-96 h-[600px]' : 'w-80 h-96'
     }`}>
-      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-blue-50 rounded-t-lg">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
@@ -252,7 +202,6 @@ const AIConfigurationAssistant = ({
         </div>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ height: isExpanded ? '480px' : '240px' }}>
         {messages.map((message) => (
           <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -288,7 +237,6 @@ const AIConfigurationAssistant = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <div className="p-4 border-t border-gray-200">
         <div className="flex space-x-2">
           <input
@@ -321,33 +269,15 @@ const defaultConfigData = {
     currency: "USD"
   },
   steps: [
-    { id: 'hardware', label: 'Hardware' },
-    { id: 'software', label: 'Software' },
-    { id: 'services', label: 'Services' },
-    { id: 'review', label: 'Review' }
+    { id: 'node', label: 'Node', required: true },
+    { id: 'chassis', label: 'Chassis', required: true },
+    { id: 'optional-software', label: 'Optional Software', required: false },
+    { id: 'required-software', label: 'Required Software', required: true },
+    { id: 'services', label: 'Services', required: false }
   ],
-  subItems: {
-    hardware: [
-      { id: 'server-nodes', label: 'Server Nodes' },
-      { id: 'enclosures', label: 'Enclosures' },
-      { id: 'storage', label: 'Storage Units' },
-      { id: 'step-review', label: 'Step Review' }
-    ],
-    software: [
-      { id: 'operating-system', label: 'Operating System' },
-      { id: 'middleware', label: 'Middleware' },
-      { id: 'licensing', label: 'Licensing' },
-      { id: 'step-review', label: 'Step Review' }
-    ],
-    services: [
-      { id: 'installation', label: 'Installation' },
-      { id: 'support', label: 'Support' },
-      { id: 'training', label: 'Training' },
-      { id: 'step-review', label: 'Step Review' }
-    ]
-  },
+  categories: ['hardware', 'software', 'services'],
   products: {
-    'server-nodes': [
+    'node': [
       {
         id: 'node-a',
         name: 'Enterprise Node A',
@@ -357,6 +287,7 @@ const defaultConfigData = {
           compute: {
             label: 'Compute Module',
             description: 'CPU and memory configuration',
+            category: 'hardware',
             required: true,
             type: 'single-select',
             defaultSelection: 'cpu-8core-32gb',
@@ -380,6 +311,7 @@ const defaultConfigData = {
           storage: {
             label: 'Storage Configuration',
             description: 'Primary and secondary storage options',
+            category: 'hardware',
             required: true,
             type: 'multi-select-quantity',
             defaultSelections: [{ optionId: 'ssd-500gb', quantity: 1 }],
@@ -401,11 +333,93 @@ const defaultConfigData = {
                 details: ['7200 RPM', '256MB cache', 'SATA 6Gb/s']
               }
             ]
+          },
+          'management-software': {
+            label: 'Management Software',
+            description: 'Node management and monitoring software',
+            category: 'software',
+            required: false,
+            type: 'single-select',
+            defaultSelection: 'basic-mgmt',
+            options: [
+              { 
+                id: 'basic-mgmt', 
+                label: 'Basic Management', 
+                description: 'Standard node management tools',
+                price: 0,
+                details: ['Web interface', 'Basic monitoring', 'SNMP support']
+              },
+              { 
+                id: 'advanced-mgmt', 
+                label: 'Advanced Management', 
+                description: 'Enhanced management with automation',
+                price: 200,
+                details: ['Advanced analytics', 'Automation tools', 'API access']
+              }
+            ]
+          },
+          'installation-service': {
+            label: 'Installation Service',
+            description: 'Professional installation and setup',
+            category: 'services',
+            required: false,
+            type: 'single-select',
+            options: [
+              { 
+                id: 'self-install', 
+                label: 'Self Installation', 
+                description: 'Install yourself with documentation',
+                price: 0,
+                details: ['Installation guide', 'Email support', 'Video tutorials']
+              },
+              { 
+                id: 'professional-install', 
+                label: 'Professional Installation', 
+                description: 'On-site professional installation',
+                price: 500,
+                details: ['On-site technician', 'Configuration setup', '2-year warranty']
+              }
+            ]
           }
         }
       }
     ],
-    'operating-system': [
+    'chassis': [
+      {
+        id: 'chassis-standard',
+        name: 'Standard Chassis',
+        description: '2U rack-mountable chassis',
+        basePrice: 800,
+        modules: {
+          'power-supply': {
+            label: 'Power Supply',
+            description: 'Redundant power supply configuration',
+            category: 'hardware',
+            required: true,
+            type: 'single-select',
+            defaultSelection: 'dual-psu-500w',
+            options: [
+              { 
+                id: 'dual-psu-500w', 
+                label: 'Dual 500W PSU', 
+                description: 'Redundant 500W power supplies',
+                price: 0,
+                details: ['Hot-swappable', '80+ Gold certified', 'Redundant operation']
+              },
+              { 
+                id: 'dual-psu-750w', 
+                label: 'Dual 750W PSU', 
+                description: 'High-capacity redundant power supplies',
+                price: 300,
+                details: ['Hot-swappable', '80+ Platinum certified', 'Higher efficiency']
+              }
+            ]
+          }
+        }
+      }
+    ],
+    'optional-software': [],
+    'required-software': [
       {
         id: 'enterprise-linux',
         name: 'Enterprise Linux',
@@ -413,8 +427,9 @@ const defaultConfigData = {
         basePrice: 200,
         modules: {
           edition: {
-            label: 'Edition Selection',
+            label: 'OS Edition',
             description: 'Choose the Linux edition',
+            category: 'software',
             required: true,
             type: 'single-select',
             defaultSelection: 'standard',
@@ -438,55 +453,32 @@ const defaultConfigData = {
         }
       }
     ],
-    'enclosures': [],
-    'storage': [],
-    'middleware': [],
-    'licensing': [],
-    'installation': [],
-    'support': [],
-    'training': []
+    'services': []
   }
 };
 
 const InfrastructureConfigurator = () => {
-  // Configuration data state
   const [configData, setConfigData] = useState(defaultConfigData);
   const [isConfigLoading, setIsConfigLoading] = useState(false);
   const [configError, setConfigError] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   
-  // UI state
-  const [currentStep, setCurrentStep] = useState('hardware');
-  const [currentSubItem, setCurrentSubItem] = useState('server-nodes');
+  const [currentStep, setCurrentStep] = useState('node');
   const [selectedProductIndex, setSelectedProductIndex] = useState(null);
-  const [detailedMode, setDetailedMode] = useState(true);
   const [showMessages, setShowMessages] = useState(false);
-  const [showSummary, setShowSummary] = useState(false);
   const [showConfigPanel, setShowConfigPanel] = useState(false);
+  const [currentCategory, setCurrentCategory] = useState('hardware');
   
-  // File upload ref
   const fileInputRef = useRef(null);
   
-  // Configuration state
   const [configuration, setConfiguration] = useState({
-    hardware: {
-      'server-nodes': { selections: [], configured: false },
-      'enclosures': { selections: [], configured: false },
-      'storage': { selections: [], configured: false }
-    },
-    software: {
-      'operating-system': { selections: [], configured: false },
-      'middleware': { selections: [], configured: false },
-      'licensing': { selections: [], configured: false }
-    },
-    services: {
-      'installation': { selections: [], configured: false },
-      'support': { selections: [], configured: false },
-      'training': { selections: [], configured: false }
-    }
+    node: { selections: [], configured: false },
+    chassis: { selections: [], configured: false },
+    'optional-software': { selections: [], configured: false },
+    'required-software': { selections: [], configured: false },
+    services: { selections: [], configured: false }
   });
 
-  // Handle file upload
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -506,16 +498,14 @@ const InfrastructureConfigurator = () => {
           setConfigError(null);
           setUploadSuccess(true);
           
-          // Clear success message after 3 seconds
           setTimeout(() => setUploadSuccess(false), 3000);
         } else {
-          setConfigError('Invalid configuration file structure. Please ensure the file contains all required sections: productInfo, steps, subItems, and products.');
+          setConfigError('Invalid configuration file structure.');
         }
       } catch (error) {
         setConfigError('Failed to parse JSON file: ' + error.message);
       } finally {
         setIsConfigLoading(false);
-        // Clear the file input
         if (event.target) {
           event.target.value = '';
         }
@@ -530,46 +520,36 @@ const InfrastructureConfigurator = () => {
     reader.readAsText(file);
   };
 
-  // Validate configuration structure
   const validateConfigStructure = (config) => {
     if (!config || typeof config !== 'object') return false;
     
-    const requiredKeys = ['productInfo', 'steps', 'subItems', 'products'];
+    const requiredKeys = ['productInfo', 'steps', 'products'];
     const hasRequiredKeys = requiredKeys.every(key => key in config);
     
     if (!hasRequiredKeys) return false;
     
-    // Additional validation
     if (!config.productInfo || typeof config.productInfo !== 'object') return false;
     if (!Array.isArray(config.steps)) return false;
-    if (!config.subItems || typeof config.subItems !== 'object') return false;
     if (!config.products || typeof config.products !== 'object') return false;
     
     return true;
   };
 
-  // Reset configuration state
   const resetConfiguration = (newConfigData = configData) => {
     const newConfig = {};
-    Object.keys(newConfigData?.subItems || {}).forEach(category => {
-      newConfig[category] = {};
-      (newConfigData.subItems[category] || []).forEach(item => {
-        if (item.id !== 'step-review') {
-          newConfig[category][item.id] = { selections: [], configured: false };
-        }
+    if (newConfigData.steps) {
+      newConfigData.steps.forEach(step => {
+        newConfig[step.id] = { selections: [], configured: false };
       });
-    });
+    }
     setConfiguration(newConfig);
     
-    // Reset to first step and sub-item
-    const firstStep = Object.keys(newConfigData?.subItems || {})[0] || 'hardware';
-    const firstSubItem = newConfigData?.subItems?.[firstStep]?.[0]?.id || 'server-nodes';
+    const firstStep = newConfigData?.steps?.[0]?.id || 'node';
     setCurrentStep(firstStep);
-    setCurrentSubItem(firstSubItem);
     setSelectedProductIndex(null);
+    setCurrentCategory('hardware');
   };
 
-  // Download current configuration
   const downloadConfiguration = () => {
     try {
       const dataStr = JSON.stringify(configData, null, 2);
@@ -586,14 +566,11 @@ const InfrastructureConfigurator = () => {
     }
   };
 
-  // Reset to default configuration
   const resetToDefault = () => {
     if (window.confirm('Are you sure you want to reset to default configuration? This will lose all current data.')) {
       setConfigData(defaultConfigData);
       resetConfiguration(defaultConfigData);
       
-      // Reset UI state
-      setShowSummary(false);
       setShowMessages(false);
       setShowConfigPanel(false);
       setConfigError(null);
@@ -601,9 +578,8 @@ const InfrastructureConfigurator = () => {
     }
   };
 
-  // Validation functions
-  const getValidationStatus = (category, subItem) => {
-    const config = configuration[category]?.[subItem];
+  const getValidationStatus = (category) => {
+    const config = configuration[category];
     if (!config || config.selections.length === 0) return 'incomplete';
     
     const hasErrors = config.selections.some(sel => !sel.configured);
@@ -620,98 +596,33 @@ const InfrastructureConfigurator = () => {
   const getAllMessages = () => {
     const messages = [];
     
-    Object.entries(configuration).forEach(([category, categoryConfig]) => {
-      Object.entries(categoryConfig).forEach(([subItem, config]) => {
-        if (subItem === 'step-review') return;
-        
-        const status = getValidationStatus(category, subItem);
-        const itemName = configData.subItems?.[category]?.find(item => item.id === subItem)?.label || subItem;
-        const availableProducts = configData.products?.[subItem] || [];
-        
-        const hasRequiredElements = availableProducts.some(product => 
-          product.modules && Object.values(product.modules).some(module => module.required)
-        );
-        
-        if (status === 'incomplete') {
-          if (hasRequiredElements) {
-            messages.push({
-              type: 'error',
-              category,
-              subItem,
-              title: `${itemName} required`,
-              message: `This section is mandatory and needs configuration`,
-              severity: 'high'
-            });
-          } else {
-            messages.push({
-              type: 'info',
-              category,
-              subItem,
-              title: `${itemName} available`,
-              message: `Optional section ready for configuration`,
-              severity: 'low'
-            });
-          }
-        } else if (status === 'error') {
-          config.selections.forEach((selection, index) => {
-            if (!selection.configured) {
-              messages.push({
-                type: 'error',
-                category,
-                subItem,
-                title: `${selection.product.name} incomplete`,
-                message: `Required configuration options are missing`,
-                severity: 'high'
-              });
-            }
+    Object.entries(configuration).forEach(([category, config]) => {
+      const status = getValidationStatus(category);
+      const stepConfig = configData.steps?.find(step => step.id === category);
+      const stepName = stepConfig?.label || category;
+      
+      if (status === 'incomplete') {
+        if (stepConfig?.required) {
+          messages.push({
+            type: 'error',
+            category,
+            title: `${stepName} required`,
+            message: `This section is mandatory and needs configuration`,
+            severity: 'high'
           });
-        } else if (status === 'warning') {
-          config.selections.forEach((selection, index) => {
-            if (selection.quantity < 1) {
-              messages.push({
-                type: 'warning',
-                category,
-                subItem,
-                title: `${selection.product.name} quantity issue`,
-                message: `Quantity should be at least 1`,
-                severity: 'medium'
-              });
-            }
+        } else {
+          messages.push({
+            type: 'info',
+            category,
+            title: `${stepName} available`,
+            message: `Optional section ready for configuration`,
+            severity: 'low'
           });
         }
-      });
+      }
     });
     
     return messages;
-  };
-
-  const getOverallStatus = () => {
-    const messages = getAllMessages();
-    const errors = messages.filter(m => m.type === 'error').length;
-    const warnings = messages.filter(m => m.type === 'warning').length;
-    
-    if (errors > 0) return 'error';
-    if (warnings > 0) return 'warning';
-    
-    const requiredSectionsConfigured = Object.entries(configuration).every(([category, categoryConfig]) => {
-      return Object.entries(categoryConfig).every(([subItem, config]) => {
-        if (subItem === 'step-review') return true;
-        
-        const availableProducts = configData.products?.[subItem] || [];
-        const hasRequiredElements = availableProducts.some(product => 
-          product.modules && Object.values(product.modules).some(module => module.required)
-        );
-        
-        if (hasRequiredElements) {
-          return config.selections.length > 0 && config.selections.every(s => s.configured);
-        }
-        
-        return true;
-      });
-    });
-    
-    if (!requiredSectionsConfigured) return 'incomplete';
-    return 'valid';
   };
 
   const getStatusIcon = (status) => {
@@ -760,28 +671,22 @@ const InfrastructureConfigurator = () => {
     return config;
   };
 
-  const updateConfiguration = (category, subItem, selections) => {
+  const updateConfiguration = (category, selections) => {
     setConfiguration(prev => ({
       ...prev,
       [category]: {
-        ...prev[category],
-        [subItem]: {
-          selections,
-          configured: selections.length > 0 && selections.every(s => s.configured)
-        }
+        selections,
+        configured: selections.length > 0 && selections.every(s => s.configured)
       }
     }));
   };
 
-  // AI Assistant Integration Functions
   const handleAIApplyConfiguration = (suggestion) => {
-    const { category, subItem, productId, config } = suggestion;
+    const { category, productId, config } = suggestion;
     
-    // Find the product
-    const product = configData.products[subItem]?.find(p => p.id === productId);
+    const product = configData.products[category]?.find(p => p.id === productId);
     if (!product) return;
 
-    // Create new selection with AI suggestion
     const newSelection = {
       productId: product.id,
       product,
@@ -790,36 +695,32 @@ const InfrastructureConfigurator = () => {
       configured: true
     };
 
-    // Get current selections and add the new one
-    const currentSelections = configuration[category]?.[subItem]?.selections || [];
+    const currentSelections = configuration[category]?.selections || [];
     const newSelections = [...currentSelections, newSelection];
     
-    // Update configuration
-    updateConfiguration(category, subItem, newSelections);
+    updateConfiguration(category, newSelections);
   };
 
-  const handleAINavigateToStep = (category, subItem) => {
+  const handleAINavigateToStep = (category) => {
     setCurrentStep(category);
-    setCurrentSubItem(subItem);
   };
 
-  const updateSelectionFromSidebar = (category, subItem, selectionIndex, updates) => {
-    const currentSelections = configuration[category]?.[subItem]?.selections || [];
+  const updateSelectionFromSidebar = (category, selectionIndex, updates) => {
+    const currentSelections = configuration[category]?.selections || [];
     const updated = [...currentSelections];
     updated[selectionIndex] = { ...updated[selectionIndex], ...updates };
-    updateConfiguration(category, subItem, updated);
+    updateConfiguration(category, updated);
   };
 
-  const removeSelectionFromSidebar = (category, subItem, selectionIndex) => {
-    const currentSelections = configuration[category]?.[subItem]?.selections || [];
+  const removeSelectionFromSidebar = (category, selectionIndex) => {
+    const currentSelections = configuration[category]?.selections || [];
     const updated = currentSelections.filter((_, i) => i !== selectionIndex);
-    updateConfiguration(category, subItem, updated);
+    updateConfiguration(category, updated);
   };
 
-  // Product selector component
-  const ProductSelector = ({ category, subItem }) => {
-    const availableProducts = configData.products[subItem] || [];
-    const currentSelections = configuration[category]?.[subItem]?.selections || [];
+  const ProductSelector = ({ category }) => {
+    const availableProducts = configData.products[category] || [];
+    const currentSelections = configuration[category]?.selections || [];
 
     const addProduct = (product) => {
       const newSelection = {
@@ -830,19 +731,19 @@ const InfrastructureConfigurator = () => {
         configured: true
       };
       const newSelections = [...currentSelections, newSelection];
-      updateConfiguration(category, subItem, newSelections);
+      updateConfiguration(category, newSelections);
       setSelectedProductIndex(newSelections.length - 1);
     };
 
     const updateSelection = (index, updates) => {
       const updated = [...currentSelections];
       updated[index] = { ...updated[index], ...updates };
-      updateConfiguration(category, subItem, updated);
+      updateConfiguration(category, updated);
     };
 
     const removeSelection = (index) => {
       const updated = currentSelections.filter((_, i) => i !== index);
-      updateConfiguration(category, subItem, updated);
+      updateConfiguration(category, updated);
       if (selectedProductIndex === index) {
         setSelectedProductIndex(null);
       } else if (selectedProductIndex > index) {
@@ -850,27 +751,140 @@ const InfrastructureConfigurator = () => {
       }
     };
 
-    // Configuration mode for specific product
     if (selectedProductIndex !== null && currentSelections[selectedProductIndex]) {
       const selection = currentSelections[selectedProductIndex];
+      
+      const modulesByCategory = {};
+      Object.entries(selection.product.modules || {}).forEach(([moduleId, module]) => {
+        const cat = module.category || 'hardware';
+        if (!modulesByCategory[cat]) {
+          modulesByCategory[cat] = [];
+        }
+        modulesByCategory[cat].push([moduleId, module]);
+      });
+
       return (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <button
-              onClick={() => setSelectedProductIndex(null)}
-              className="flex items-center space-x-2 text-blue-600 hover:text-blue-800"
-            >
-              <span className="text-sm">← Back to Product List</span>
-            </button>
-            <span className="text-sm text-gray-500">
-              Configuring: {selection.product.name} (#{selectedProductIndex + 1})
-            </span>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setSelectedProductIndex(null)}
+                className="text-blue-600 hover:text-blue-800 text-sm"
+              >
+                ← Back to Product List
+              </button>
+              <span className="text-gray-400">|</span>
+              <span className="text-sm text-gray-900 font-medium">
+                {selection.product.name}
+              </span>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              {(() => {
+                const messages = getAllMessages();
+                const errors = messages.filter(m => m.type === 'error').length;
+                const warnings = messages.filter(m => m.type === 'warning').length;
+                const infos = messages.filter(m => m.type === 'info').length;
+                
+                if (errors > 0 || warnings > 0 || infos > 0) {
+                  return (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowMessages(!showMessages)}
+                        className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          errors > 0 
+                            ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200' 
+                            : warnings > 0
+                            ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-200'
+                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200'
+                        }`}
+                      >
+                        {errors > 0 ? (
+                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                        ) : warnings > 0 ? (
+                          <div className="w-2 h-2 bg-yellow-500 rounded-full" />
+                        ) : (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                        )}
+                        <span>
+                          {errors > 0 ? `${errors} issue${errors !== 1 ? 's' : ''}` : 
+                           warnings > 0 ? `${warnings} warning${warnings !== 1 ? 's' : ''}` :
+                           `${infos} info`}
+                        </span>
+                        {showMessages ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </button>
+
+                      {showMessages && (
+                        <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                          <div className="p-3 border-b border-gray-100">
+                            <h3 className="text-sm font-medium text-gray-900">
+                              {errors > 0 ? 'Issues to Fix' : warnings > 0 ? 'Warnings' : 'Information'}
+                            </h3>
+                          </div>
+                          <div className="max-h-64 overflow-y-auto">
+                            {messages.slice(0, 6).map((message, index) => (
+                              <div
+                                key={index}
+                                className="p-3 hover:bg-gray-50 border-b border-gray-50 last:border-b-0"
+                              >
+                                <div className="flex items-start space-x-3">
+                                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                                    message.type === 'error' ? 'bg-red-500' : 
+                                    message.type === 'warning' ? 'bg-yellow-500' :
+                                    'bg-blue-500'
+                                  }`} />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium text-gray-900 truncate">
+                                      {message.title}
+                                    </div>
+                                    <div className="text-xs text-gray-600 mt-0.5">
+                                      {message.message}
+                                    </div>
+                                    {message.type !== 'info' && (
+                                      <button
+                                        onClick={() => {
+                                          setCurrentStep(message.category);
+                                          setShowMessages(false);
+                                        }}
+                                        className="text-xs text-blue-600 hover:text-blue-800 mt-1 font-medium"
+                                      >
+                                        {message.type === 'error' ? 'Fix now →' : 'Review →'}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+          </div>
+
+          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+            {(configData.categories || ['hardware', 'software', 'services']).map(cat => (
+              <button
+                key={cat}
+                onClick={() => setCurrentCategory(cat)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors capitalize ${
+                  currentCategory === cat
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
 
           <div className="border rounded-lg p-6 bg-gray-50">
-
             <div className="space-y-6">
-              {Object.entries(selection.product.modules || {}).map(([moduleId, module]) => (
+              {modulesByCategory[currentCategory]?.map(([moduleId, module]) => (
                 <div key={moduleId} className="bg-white rounded-lg border p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div>
@@ -880,9 +894,6 @@ const InfrastructureConfigurator = () => {
                       </h4>
                       <p className="text-sm text-gray-600 mt-1">{module.description}</p>
                     </div>
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                      {module.type === 'single-select' ? 'Single Select' : 'Multi Select'}
-                    </span>
                   </div>
 
                   {module.type === 'single-select' && (
@@ -913,7 +924,7 @@ const InfrastructureConfigurator = () => {
                                   </div>
                                   <div className="text-right">
                                     <div className="font-semibold text-green-600">
-                                      {option.price === 0 ? 'Included' : `+$${option.price.toLocaleString()}`}
+                                      {option.price === 0 ? 'Included' : `+${option.price.toLocaleString()}`}
                                     </div>
                                   </div>
                                 </div>
@@ -1036,7 +1047,11 @@ const InfrastructureConfigurator = () => {
                     </div>
                   )}
                 </div>
-              ))}
+              )) || (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No {currentCategory} modules available for this product.</p>
+                </div>
+              )}
             </div>
             
             <div className="mt-6 pt-6 border-t bg-white rounded p-4">
@@ -1065,7 +1080,6 @@ const InfrastructureConfigurator = () => {
       );
     }
 
-    // Product overview mode
     return (
       <div className="space-y-6">
         {currentSelections.length > 0 && (
@@ -1105,9 +1119,6 @@ const InfrastructureConfigurator = () => {
         )}
 
         <div>
-          <h3 className="text-lg font-semibold mb-4">
-            {currentSelections.length > 0 ? 'Add More Products' : 'Available Products'}
-          </h3>
           {availableProducts.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {availableProducts.map(product => (
@@ -1157,14 +1168,12 @@ const InfrastructureConfigurator = () => {
     );
   };
 
-  // Reset selected product when changing sections
   useEffect(() => {
     setSelectedProductIndex(null);
-  }, [currentStep, currentSubItem]);
+  }, [currentStep]);
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Product Header Section */}
       <div className="bg-white border-b">
         <div className="max-w-full px-6 py-4">
           <div className="flex justify-between items-center">
@@ -1187,14 +1196,12 @@ const InfrastructureConfigurator = () => {
                   <div className="text-lg font-semibold text-green-600">
                     ${(() => {
                       let total = 0;
-                      Object.entries(configuration).forEach(([category, categoryConfig]) => {
-                        Object.entries(categoryConfig).forEach(([subItem, config]) => {
-                          if (config.selections) {
-                            total += config.selections.reduce((sum, selection) => {
-                              return sum + calculatePrice(selection.product, selection.config, selection.quantity);
-                            }, 0);
-                          }
-                        });
+                      Object.entries(configuration).forEach(([category, config]) => {
+                        if (config.selections) {
+                          total += config.selections.reduce((sum, selection) => {
+                            return sum + calculatePrice(selection.product, selection.config, selection.quantity);
+                          }, 0);
+                        }
                       });
                       return total.toLocaleString();
                     })()}
@@ -1219,7 +1226,6 @@ const InfrastructureConfigurator = () => {
             </div>
           </div>
           
-          {/* Configuration Panel */}
           {showConfigPanel && (
             <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
               <h3 className="text-sm font-medium text-gray-900 mb-3">Configuration Management</h3>
@@ -1280,127 +1286,120 @@ const InfrastructureConfigurator = () => {
         </div>
       </div>
 
-      {/* Top Navigation */}
-      <div className="bg-white border-b shadow-sm">
-        <div className="max-w-full px-6">
-          <div className="flex justify-between items-center">
-            <div className="flex space-x-8">
+      <div className="flex-1 flex">
+        <div className="w-80 bg-white border-r shadow-sm flex flex-col">
+          <div className="flex-1 overflow-y-auto">
+            <nav className="p-4 space-y-1">
               {(configData.steps || []).map((step) => {
                 const isActive = currentStep === step.id;
-                return (
-                  <button
-                    key={step.id}
-                    onClick={() => {
-                      setCurrentStep(step.id);
-                      if (step.id !== 'review') {
-                        setCurrentSubItem(configData.subItems?.[step.id]?.[0]?.id);
-                      }
-                    }}
-                    className={`py-4 px-3 border-b-2 transition-colors ${
-                      isActive
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <span className="font-medium">{step.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-            
-            {/* Messages Display Only */}
-            <div className="flex items-center space-x-4">
-              {(() => {
-                const messages = getAllMessages();
-                const errors = messages.filter(m => m.type === 'error').length;
-                const warnings = messages.filter(m => m.type === 'warning').length;
-                const infos = messages.filter(m => m.type === 'info').length;
+                const stepSelections = configuration[step.id]?.selections || [];
+                const stepStatus = getValidationStatus(step.id);
                 
-                if (errors > 0 || warnings > 0 || infos > 0) {
-                  return (
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowMessages(!showMessages)}
-                        className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                          errors > 0 
-                            ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200' 
-                            : warnings > 0
-                            ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-200'
-                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200'
-                        }`}
-                      >
-                        {errors > 0 ? (
-                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                        ) : warnings > 0 ? (
-                          <div className="w-2 h-2 bg-yellow-500 rounded-full" />
-                        ) : (
-                          <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                return (
+                  <div key={step.id}>
+                    <button
+                      onClick={() => {
+                        setCurrentStep(step.id);
+                      }}
+                      className={`w-full flex items-center justify-between p-3 rounded transition-colors ${
+                        isActive
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-medium">{step.label}</span>
+                        {step.required && (
+                          <span className="text-red-400 text-sm">*</span>
                         )}
-                        <span>
-                          {errors > 0 ? `${errors} issue${errors !== 1 ? 's' : ''}` : 
-                           warnings > 0 ? `${warnings} warning${warnings !== 1 ? 's' : ''}` :
-                           `${infos} info`}
-                        </span>
-                        {showMessages ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      </button>
+                        {stepSelections.length > 0 && (
+                          <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">
+                            {stepSelections.length}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {getStatusIcon(stepStatus)}
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </button>
 
-                      {/* Compact Messages Dropdown */}
-                      {showMessages && (
-                        <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                          <div className="p-3 border-b border-gray-100">
-                            <h3 className="text-sm font-medium text-gray-900">
-                              {errors > 0 ? 'Issues to Fix' : warnings > 0 ? 'Warnings' : 'Information'}
-                            </h3>
-                          </div>
-                          <div className="max-h-64 overflow-y-auto">
-                            {messages
-                              .sort((a, b) => {
-                                const order = { error: 0, warning: 1, info: 2 };
-                                return order[a.type] - order[b.type];
-                              })
-                              .slice(0, 6)
-                              .map((message, index) => (
-                              <div
-                                key={index}
-                                className="p-3 hover:bg-gray-50 border-b border-gray-50 last:border-b-0"
-                              >
-                                <div className="flex items-start space-x-3">
-                                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                                    message.type === 'error' ? 'bg-red-500' : 
-                                    message.type === 'warning' ? 'bg-yellow-500' :
-                                    'bg-blue-500'
-                                  } ${message.type === 'error' ? 'animate-pulse' : ''}`} />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium text-gray-900 truncate">
-                                      {message.title}
-                                    </div>
-                                    <div className="text-xs text-gray-600 mt-0.5">
-                                      {message.message}
-                                    </div>
-                                    {message.type !== 'info' && (
-                                      <button
-                                        onClick={() => {
-                                          setCurrentStep(message.category);
-                                          setCurrentSubItem(message.subItem);
-                                          setShowMessages(false);
-                                        }}
-                                        className="text-xs text-blue-600 hover:text-blue-800 mt-1 font-medium"
-                                      >
-                                        {message.type === 'error' ? 'Fix now →' : 'Review →'}
-                                      </button>
-                                    )}
-                                  </div>
+                    {isActive && stepSelections.length > 0 && (
+                      <div className="ml-6 mt-2 space-y-2">
+                        {stepSelections.map((selection, index) => (
+                          <div key={index} className="bg-gray-50 rounded p-3 border text-xs">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-gray-800 truncate">
+                                {selection.product.name}
+                              </span>
+                              <div className="flex items-center space-x-1">
+                                <button
+                                  onClick={() => {
+                                    setSelectedProductIndex(index);
+                                  }}
+                                  className="text-blue-500 hover:text-blue-700 p-0.5"
+                                  title="Configure"
+                                >
+                                  <Settings className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => removeSelectionFromSidebar(step.id, index)}
+                                  className="text-red-500 hover:text-red-700 p-0.5"
+                                  title="Remove"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center space-x-1">
+                                <span className="text-gray-500">Qty:</span>
+                                <div className="flex items-center space-x-1">
+                                  <button
+                                    onClick={() => {
+                                      const newQty = Math.max(1, selection.quantity - 1);
+                                      updateSelectionFromSidebar(step.id, index, { quantity: newQty });
+                                    }}
+                                    className="w-4 h-4 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-xs"
+                                  >
+                                    <Minus className="w-2 h-2" />
+                                  </button>
+                                  <span className="font-medium w-6 text-center">{selection.quantity}</span>
+                                  <button
+                                    onClick={() => {
+                                      updateSelectionFromSidebar(step.id, index, { quantity: selection.quantity + 1 });
+                                    }}
+                                    className="w-4 h-4 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-xs"
+                                  >
+                                    <Plus className="w-2 h-2" />
+                                  </button>
                                 </div>
                               </div>
-                            ))}
-                            {messages.length > 6 && (
-                              <div className="p-3 text-center text-xs text-gray-500 bg-gray-50">
-                                +{messages.length - 6} more messages
-                              </div>
-                            )}
+                              <span className="text-green-600 font-medium text-xs">
+                                ${calculatePrice(selection.product, selection.config, selection.quantity).toLocaleString()}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </nav>
+
+            <div className="p-3 border-t bg-gray-50">
+              {(() => {
+                const categoryTotal = configuration[currentStep]?.selections?.reduce((sum, selection) => {
+                  return sum + calculatePrice(selection.product, selection.config, selection.quantity);
+                }, 0) || 0;
+                
+                if (categoryTotal > 0) {
+                  return (
+                    <div className="flex justify-between items-center text-xs font-medium">
+                      <span className="text-gray-700 capitalize">{currentStep} Total:</span>
+                      <span className="text-green-600">${categoryTotal.toLocaleString()}</span>
                     </div>
                   );
                 }
@@ -1409,290 +1408,113 @@ const InfrastructureConfigurator = () => {
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="flex-1 flex">
-        {/* Left Sidebar */}
-        {currentStep !== 'review' && (
-          <div className="w-80 bg-white border-r shadow-sm flex flex-col">
-            <div className="flex-1 overflow-y-auto">
-              <nav className="p-4 space-y-1">
-                {(configData.subItems?.[currentStep] || []).map((item) => {
-                  const isActive = currentSubItem === item.id;
-                  const status = item.id !== 'step-review' 
-                    ? getValidationStatus(currentStep, item.id)
-                    : 'valid';
-                  const selections = configuration[currentStep]?.[item.id]?.selections || [];
-                  
-                  const availableProducts = configData.products[item.id] || [];
-                  const isRequired = availableProducts.some(product => 
-                    product.modules && Object.values(product.modules).some(module => module.required)
-                  );
-                  
-                  return (
-                    <div key={item.id}>
-                      <button
-                        onClick={() => setCurrentSubItem(item.id)}
-                        className={`w-full flex items-center justify-between p-3 rounded transition-colors ${
-                          isActive
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium">{item.label}</span>
-                          {isRequired && item.id !== 'step-review' && (
-                            <span className="text-red-400 text-sm">*</span>
-                          )}
-                        </div>
-                        {getStatusIcon(status)}
-                      </button>
-
-                      {item.id !== 'step-review' && selections.length > 0 && (
-                        <div className="ml-6 mt-1 space-y-1">
-                          {selections.map((selection, index) => (
-                            <div key={index} className="bg-gray-50 rounded p-2 border text-xs">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="font-medium text-gray-800 truncate text-xs">
-                                  {selection.product.name}
-                                </span>
-                                <div className="flex items-center space-x-1">
-                                  <button
-                                    onClick={() => {
-                                      setCurrentSubItem(item.id);
-                                      setSelectedProductIndex(index);
-                                    }}
-                                    className="text-blue-500 hover:text-blue-700 p-0.5"
-                                    title="Configure"
-                                  >
-                                    <Settings className="w-3 h-3" />
-                                  </button>
-                                  <button
-                                    onClick={() => removeSelectionFromSidebar(currentStep, item.id, index)}
-                                    className="text-red-500 hover:text-red-700 p-0.5"
-                                    title="Remove"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              </div>
-                              
-                              <div className="flex items-center justify-between text-xs">
-                                <div className="flex items-center space-x-1">
-                                  <span className="text-gray-500">Qty:</span>
-                                  <div className="flex items-center space-x-1">
-                                    <button
-                                      onClick={() => {
-                                        const newQty = Math.max(1, selection.quantity - 1);
-                                        updateSelectionFromSidebar(currentStep, item.id, index, { quantity: newQty });
-                                      }}
-                                      className="w-4 h-4 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-xs"
-                                    >
-                                      <Minus className="w-2 h-2" />
-                                    </button>
-                                    <span className="font-medium w-6 text-center">{selection.quantity}</span>
-                                    <button
-                                      onClick={() => {
-                                        updateSelectionFromSidebar(currentStep, item.id, index, { quantity: selection.quantity + 1 });
-                                      }}
-                                      className="w-4 h-4 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-xs"
-                                    >
-                                      <Plus className="w-2 h-2" />
-                                    </button>
-                                  </div>
-                                </div>
-                                <span className="text-green-600 font-medium text-xs">
-                                  ${calculatePrice(selection.product, selection.config, selection.quantity).toLocaleString()}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </nav>
-
-              <div className="p-3 border-t bg-gray-50">
-                {(() => {
-                  const categoryTotal = Object.entries(configuration[currentStep] || {}).reduce((sum, [subItem, config]) => {
-                    if (config.selections) {
-                      return sum + config.selections.reduce((subSum, selection) => {
-                        return subSum + calculatePrice(selection.product, selection.config, selection.quantity);
-                      }, 0);
-                    }
-                    return sum;
-                  }, 0);
-                  
-                  if (categoryTotal > 0) {
-                    return (
-                      <div className="flex justify-between items-center text-xs font-medium">
-                        <span className="text-gray-700 capitalize">{currentStep} Total:</span>
-                        <span className="text-green-600">${categoryTotal.toLocaleString()}</span>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Main Content */}
         <div className="flex-1 bg-white">
           <div className="p-6">
             <div className="max-w-none">
-              {currentStep === 'review' ? (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold text-gray-900">Configuration Summary</h2>
+              {/* Header with Messages - only show "Available Products" if no products added and not in configuration mode */}
+              {selectedProductIndex === null && (
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-4">
+                    {configuration[currentStep]?.selections?.length === 0 && (
+                      <h2 className="text-xl font-semibold text-gray-900">Available Products</h2>
+                    )}
+                  </div>
                   
-                  {/* Category Summary */}
-                  {Object.entries(configuration).map(([category, categoryConfig]) => {
-                    const categorySelections = Object.entries(categoryConfig).reduce((acc, [subItem, config]) => {
-                      if (config.selections && config.selections.length > 0) {
-                        acc.push(...config.selections.map(selection => ({
-                          ...selection,
-                          subItem,
-                          subItemLabel: configData.subItems[category]?.find(item => item.id === subItem)?.label || subItem
-                        })));
-                      }
-                      return acc;
-                    }, []);
+                  <div className="flex items-center space-x-4">
+                    {(() => {
+                      const messages = getAllMessages();
+                      const errors = messages.filter(m => m.type === 'error').length;
+                      const warnings = messages.filter(m => m.type === 'warning').length;
+                      const infos = messages.filter(m => m.type === 'info').length;
+                      
+                      if (errors > 0 || warnings > 0 || infos > 0) {
+                        return (
+                          <div className="relative">
+                            <button
+                              onClick={() => setShowMessages(!showMessages)}
+                              className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                                errors > 0 
+                                  ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200' 
+                                  : warnings > 0
+                                  ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-200'
+                                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200'
+                              }`}
+                            >
+                              {errors > 0 ? (
+                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                              ) : warnings > 0 ? (
+                                <div className="w-2 h-2 bg-yellow-500 rounded-full" />
+                              ) : (
+                                <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                              )}
+                              <span>
+                                {errors > 0 ? `${errors} issue${errors !== 1 ? 's' : ''}` : 
+                                 warnings > 0 ? `${warnings} warning${warnings !== 1 ? 's' : ''}` :
+                                 `${infos} info`}
+                              </span>
+                              {showMessages ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            </button>
 
-                    if (categorySelections.length === 0) return null;
-
-                    const categoryTotal = categorySelections.reduce((sum, selection) => {
-                      return sum + calculatePrice(selection.product, selection.config, selection.quantity);
-                    }, 0);
-
-                    return (
-                      <div key={category} className="bg-white border rounded-lg p-6">
-                        <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
-                          <h3 className="text-lg font-semibold text-gray-900 capitalize">{category}</h3>
-                          <span className="text-lg font-semibold text-green-600">${categoryTotal.toLocaleString()}</span>
-                        </div>
-                        
-                        {/* Items under category */}
-                        <div className="space-y-4">
-                          {categorySelections.map((selection, index) => (
-                            <div key={`${selection.subItem}-${index}`} className="bg-gray-50 rounded-lg p-4">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <div className="text-lg font-medium text-gray-900">
-                                    {selection.product.name}
-                                  </div>
-                                  <div className="text-sm text-gray-600 mt-1">
-                                    {selection.product.description}
-                                  </div>
-                                  <div className="text-sm text-gray-500 mt-2">
-                                    <span className="font-medium">Category:</span> {selection.subItemLabel}
-                                  </div>
-                                  <div className="text-sm text-gray-500 mt-1">
-                                    <span className="font-medium">Quantity:</span> {selection.quantity} × 
-                                    <span className="font-medium"> Base Price:</span> ${selection.product.basePrice.toLocaleString()}
-                                  </div>
-                                  
-                                  {/* Configuration Details */}
-                                  {selection.config && Object.keys(selection.config).length > 0 && (
-                                    <div className="mt-3">
-                                      <div className="text-sm font-medium text-gray-700 mb-2">Configuration:</div>
-                                      <div className="space-y-1">
-                                        {Object.entries(selection.config).map(([moduleId, moduleConfig]) => {
-                                          const module = selection.product.modules?.[moduleId];
-                                          if (!module) return null;
-                                          
-                                          if (module.type === 'single-select' && moduleConfig) {
-                                            const selectedOption = module.options.find(opt => opt.id === moduleConfig);
-                                            return (
-                                              <div key={moduleId} className="text-xs text-gray-600">
-                                                <span className="font-medium">{module.label}:</span> {selectedOption?.label}
-                                                {selectedOption?.price > 0 && (
-                                                  <span className="text-green-600 ml-1">(+${selectedOption.price.toLocaleString()})</span>
-                                                )}
-                                              </div>
-                                            );
-                                          }
-                                          
-                                          if (module.type === 'multi-select-quantity' && Array.isArray(moduleConfig)) {
-                                            return (
-                                              <div key={moduleId} className="text-xs text-gray-600">
-                                                <span className="font-medium">{module.label}:</span>
-                                                {moduleConfig.map((item, idx) => {
-                                                  const option = module.options.find(opt => opt.id === item.optionId);
-                                                  return option ? (
-                                                    <span key={idx} className="ml-1">
-                                                      {option.label} × {item.quantity}
-                                                      <span className="text-green-600">(+${(option.price * item.quantity).toLocaleString()})</span>
-                                                      {idx < moduleConfig.length - 1 ? ', ' : ''}
-                                                    </span>
-                                                  ) : null;
-                                                })}
-                                              </div>
-                                            );
-                                          }
-                                          
-                                          return null;
-                                        })}
+                            {showMessages && (
+                              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                <div className="p-3 border-b border-gray-100">
+                                  <h3 className="text-sm font-medium text-gray-900">
+                                    {errors > 0 ? 'Issues to Fix' : warnings > 0 ? 'Warnings' : 'Information'}
+                                  </h3>
+                                </div>
+                                <div className="max-h-64 overflow-y-auto">
+                                  {messages.slice(0, 6).map((message, index) => (
+                                    <div
+                                      key={index}
+                                      className="p-3 hover:bg-gray-50 border-b border-gray-50 last:border-b-0"
+                                    >
+                                      <div className="flex items-start space-x-3">
+                                        <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                                          message.type === 'error' ? 'bg-red-500' : 
+                                          message.type === 'warning' ? 'bg-yellow-500' :
+                                          'bg-blue-500'
+                                        }`} />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-sm font-medium text-gray-900 truncate">
+                                            {message.title}
+                                          </div>
+                                          <div className="text-xs text-gray-600 mt-0.5">
+                                            {message.message}
+                                          </div>
+                                          {message.type !== 'info' && (
+                                            <button
+                                              onClick={() => {
+                                                setCurrentStep(message.category);
+                                                setShowMessages(false);
+                                              }}
+                                              className="text-xs text-blue-600 hover:text-blue-800 mt-1 font-medium"
+                                            >
+                                              {message.type === 'error' ? 'Fix now →' : 'Review →'}
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
-                                  )}
-                                </div>
-                                <div className="text-right ml-4">
-                                  <span className="text-xl font-bold text-green-600">
-                                    ${calculatePrice(selection.product, selection.config, selection.quantity).toLocaleString()}
-                                  </span>
+                                  ))}
                                 </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Overall Total */}
-                  {(() => {
-                    const grandTotal = Object.entries(configuration).reduce((total, [category, categoryConfig]) => {
-                      return total + Object.entries(categoryConfig).reduce((catSum, [subItem, config]) => {
-                        if (config.selections) {
-                          return catSum + config.selections.reduce((subSum, selection) => {
-                            return subSum + calculatePrice(selection.product, selection.config, selection.quantity);
-                          }, 0);
-                        }
-                        return catSum;
-                      }, 0);
-                    }, 0);
-                    
-                    if (grandTotal > 0) {
-                      return (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                          <div className="flex justify-between items-center">
-                            <h3 className="text-xl font-semibold text-gray-900">Total Configuration Cost</h3>
-                            <span className="text-2xl font-bold text-green-600">${grandTotal.toLocaleString()}</span>
+                            )}
                           </div>
-                        </div>
-                      );
-                    }
-                    
-                    return (
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                        <h3 className="text-lg font-medium text-gray-600">No products configured yet</h3>
-                        <p className="text-gray-500 mt-1">Start by selecting products from the Hardware, Software, or Services sections.</p>
-                      </div>
-                    );
-                  })()}
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                 </div>
-              ) : (
-                <ProductSelector category={currentStep} subItem={currentSubItem} />
               )}
+              
+              <ProductSelector category={currentStep} />
             </div>
           </div>
         </div>
       </div>
       
-      {/* AI Configuration Assistant */}
       <AIConfigurationAssistant
         configData={configData}
         configuration={configuration}
