@@ -16,10 +16,11 @@ import {
   Bot,
   Send,
   Maximize2,
-  Minimize2
+  Minimize2,
+  GitCompare,
+  ArrowRight
 } from 'lucide-react';
 
-// AI Configuration Assistant Component
 const AIConfigurationAssistant = ({ 
   configData, 
   configuration, 
@@ -40,7 +41,6 @@ const AIConfigurationAssistant = ({
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Mock AI responses based on user input
   const mockAIResponses = {
     'web application': {
       response: "For a web application, I recommend starting with our Enterprise Node A with 16-Core CPU + 64GB RAM for better performance. You'll also want SSD storage for faster response times. Would you like me to configure this for you?",
@@ -260,7 +260,6 @@ const AIConfigurationAssistant = ({
   );
 };
 
-// Default configuration data
 const defaultConfigData = {
   productInfo: {
     name: "PowerStore",
@@ -468,6 +467,8 @@ const InfrastructureConfigurator = () => {
   const [showMessages, setShowMessages] = useState(false);
   const [showConfigPanel, setShowConfigPanel] = useState(false);
   const [currentCategory, setCurrentCategory] = useState('hardware');
+  const [showCompareModal, setShowCompareModal] = useState(false);
+  const [compareData, setCompareData] = useState(null);
   
   const fileInputRef = useRef(null);
   
@@ -478,105 +479,6 @@ const InfrastructureConfigurator = () => {
     'required-software': { selections: [], configured: false },
     services: { selections: [], configured: false }
   });
-
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    setIsConfigLoading(true);
-    setConfigError(null);
-    setUploadSuccess(false);
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const uploadedConfig = JSON.parse(e.target.result);
-        
-        if (validateConfigStructure(uploadedConfig)) {
-          setConfigData(uploadedConfig);
-          resetConfiguration(uploadedConfig);
-          setConfigError(null);
-          setUploadSuccess(true);
-          
-          setTimeout(() => setUploadSuccess(false), 3000);
-        } else {
-          setConfigError('Invalid configuration file structure.');
-        }
-      } catch (error) {
-        setConfigError('Failed to parse JSON file: ' + error.message);
-      } finally {
-        setIsConfigLoading(false);
-        if (event.target) {
-          event.target.value = '';
-        }
-      }
-    };
-
-    reader.onerror = () => {
-      setConfigError('Failed to read the file. Please try again.');
-      setIsConfigLoading(false);
-    };
-
-    reader.readAsText(file);
-  };
-
-  const validateConfigStructure = (config) => {
-    if (!config || typeof config !== 'object') return false;
-    
-    const requiredKeys = ['productInfo', 'steps', 'products'];
-    const hasRequiredKeys = requiredKeys.every(key => key in config);
-    
-    if (!hasRequiredKeys) return false;
-    
-    if (!config.productInfo || typeof config.productInfo !== 'object') return false;
-    if (!Array.isArray(config.steps)) return false;
-    if (!config.products || typeof config.products !== 'object') return false;
-    
-    return true;
-  };
-
-  const resetConfiguration = (newConfigData = configData) => {
-    const newConfig = {};
-    if (newConfigData.steps) {
-      newConfigData.steps.forEach(step => {
-        newConfig[step.id] = { selections: [], configured: false };
-      });
-    }
-    setConfiguration(newConfig);
-    
-    const firstStep = newConfigData?.steps?.[0]?.id || 'node';
-    setCurrentStep(firstStep);
-    setSelectedProductIndex(null);
-    setCurrentCategory('hardware');
-  };
-
-  const downloadConfiguration = () => {
-    try {
-      const dataStr = JSON.stringify(configData, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-      
-      const exportFileDefaultName = `infrastructure-config-${new Date().toISOString().split('T')[0]}.json`;
-      
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      linkElement.click();
-    } catch (error) {
-      setConfigError('Failed to download configuration: ' + error.message);
-    }
-  };
-
-  const resetToDefault = () => {
-    if (window.confirm('Are you sure you want to reset to default configuration? This will lose all current data.')) {
-      setConfigData(defaultConfigData);
-      resetConfiguration(defaultConfigData);
-      
-      setShowMessages(false);
-      setShowConfigPanel(false);
-      setConfigError(null);
-      setUploadSuccess(false);
-    }
-  };
 
   const getValidationStatus = (category) => {
     const config = configuration[category];
@@ -705,17 +607,392 @@ const InfrastructureConfigurator = () => {
     setCurrentStep(category);
   };
 
-  const updateSelectionFromSidebar = (category, selectionIndex, updates) => {
-    const currentSelections = configuration[category]?.selections || [];
-    const updated = [...currentSelections];
-    updated[selectionIndex] = { ...updated[selectionIndex], ...updates };
-    updateConfiguration(category, updated);
-  };
-
   const removeSelectionFromSidebar = (category, selectionIndex) => {
     const currentSelections = configuration[category]?.selections || [];
     const updated = currentSelections.filter((_, i) => i !== selectionIndex);
     updateConfiguration(category, updated);
+  };
+
+  const getConfigurationDifferences = (product, currentConfig) => {
+    const defaultConfig = getDefaultConfig(product);
+    const differences = [];
+    
+    // Compare each module
+    Object.entries(product.modules || {}).forEach(([moduleId, module]) => {
+      const currentValue = currentConfig[moduleId];
+      const defaultValue = defaultConfig[moduleId];
+      
+      if (module.type === 'single-select') {
+        if (currentValue !== defaultValue) {
+          const currentOption = module.options.find(opt => opt.id === currentValue);
+          const defaultOption = module.options.find(opt => opt.id === defaultValue);
+          
+          differences.push({
+            moduleId,
+            moduleName: module.label,
+            type: 'single-select',
+            defaultValue: defaultOption?.label || 'None',
+            currentValue: currentOption?.label || 'None',
+            defaultPrice: defaultOption?.price || 0,
+            currentPrice: currentOption?.price || 0,
+            priceDifference: (currentOption?.price || 0) - (defaultOption?.price || 0)
+          });
+        }
+      } else if (module.type === 'multi-select-quantity') {
+        const currentSelections = currentValue || [];
+        const defaultSelections = defaultValue || [];
+        
+        // Check if quantities or selections are different
+        const currentMap = new Map(currentSelections.map(s => [s.optionId, s.quantity]));
+        const defaultMap = new Map(defaultSelections.map(s => [s.optionId, s.quantity]));
+        
+        let isDifferent = false;
+        let currentTotal = 0;
+        let defaultTotal = 0;
+        
+        // Calculate totals and check differences
+        module.options.forEach(option => {
+          const currentQty = currentMap.get(option.id) || 0;
+          const defaultQty = defaultMap.get(option.id) || 0;
+          
+          currentTotal += currentQty * option.price;
+          defaultTotal += defaultQty * option.price;
+          
+          if (currentQty !== defaultQty) {
+            isDifferent = true;
+          }
+        });
+        
+        if (isDifferent) {
+          differences.push({
+            moduleId,
+            moduleName: module.label,
+            type: 'multi-select-quantity',
+            defaultValue: `${defaultSelections.length} items`,
+            currentValue: `${currentSelections.length} items`,
+            defaultPrice: defaultTotal,
+            currentPrice: currentTotal,
+            priceDifference: currentTotal - defaultTotal,
+            details: {
+              current: currentSelections,
+              default: defaultSelections,
+              options: module.options
+            }
+          });
+        }
+      }
+    });
+    
+    return differences;
+  };
+
+  const openCompareModal = (selection) => {
+    const differences = getConfigurationDifferences(selection.product, selection.config);
+    const defaultConfig = getDefaultConfig(selection.product);
+    const defaultPrice = calculatePrice(selection.product, defaultConfig, selection.quantity);
+    const currentPrice = calculatePrice(selection.product, selection.config, selection.quantity);
+    
+    setCompareData({
+      product: selection.product,
+      currentConfig: selection.config,
+      defaultConfig,
+      differences,
+      defaultPrice,
+      currentPrice,
+      priceDifference: currentPrice - defaultPrice,
+      quantity: selection.quantity
+    });
+    setShowCompareModal(true);
+  };
+
+  const CompareModal = () => {
+    if (!showCompareModal || !compareData) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <GitCompare className="w-6 h-6 text-blue-600" />
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Configuration Comparison</h2>
+                  <p className="text-sm text-gray-600">{compareData.product.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCompareModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+          
+          <div className="p-6">
+            {/* Price Summary */}
+            <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="text-center">
+                <div className="text-sm text-gray-500">Default Price</div>
+                <div className="text-lg font-semibold text-gray-900">
+                  ${compareData.defaultPrice.toLocaleString()}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-gray-500">Current Price</div>
+                <div className="text-lg font-semibold text-blue-600">
+                  ${compareData.currentPrice.toLocaleString()}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-gray-500">Price Difference</div>
+                <div className={`text-lg font-semibold ${
+                  compareData.priceDifference > 0 ? 'text-red-600' : 
+                  compareData.priceDifference < 0 ? 'text-green-600' : 'text-gray-600'
+                }`}>
+                  {compareData.priceDifference > 0 ? '+' : ''}${compareData.priceDifference.toLocaleString()}
+                </div>
+              </div>
+            </div>
+            
+            {/* Differences */}
+            {compareData.differences.length > 0 ? (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Configuration Changes</h3>
+                {compareData.differences.map((diff, index) => (
+                  <div key={index} className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-gray-900">{diff.moduleName}</h4>
+                      <div className={`text-sm font-medium ${
+                        diff.priceDifference > 0 ? 'text-red-600' : 
+                        diff.priceDifference < 0 ? 'text-green-600' : 'text-gray-600'
+                      }`}>
+                        {diff.priceDifference > 0 ? '+' : ''}${diff.priceDifference.toLocaleString()}
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="p-3 bg-gray-50 rounded">
+                        <div className="font-medium text-gray-700 mb-1">Default</div>
+                        <div className="text-gray-900">{diff.defaultValue}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          ${diff.defaultPrice.toLocaleString()}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-center">
+                        <ArrowRight className="w-4 h-4 text-gray-400" />
+                      </div>
+                      
+                      <div className="p-3 bg-blue-50 rounded">
+                        <div className="font-medium text-blue-700 mb-1">Current</div>
+                        <div className="text-blue-900">{diff.currentValue}</div>
+                        <div className="text-xs text-blue-600 mt-1">
+                          ${diff.currentPrice.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Detailed breakdown for multi-select */}
+                    {diff.type === 'multi-select-quantity' && diff.details && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <div className="text-sm font-medium text-gray-700 mb-2">Detailed Breakdown:</div>
+                        <div className="space-y-2">
+                          {diff.details.options.map(option => {
+                            const currentQty = diff.details.current.find(s => s.optionId === option.id)?.quantity || 0;
+                            const defaultQty = diff.details.default.find(s => s.optionId === option.id)?.quantity || 0;
+                            
+                            if (currentQty !== defaultQty) {
+                              return (
+                                <div key={option.id} className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded">
+                                  <span>{option.label}</span>
+                                  <span className="flex items-center space-x-2">
+                                    <span className="text-gray-600">{defaultQty}</span>
+                                    <ArrowRight className="w-3 h-3 text-gray-400" />
+                                    <span className="text-blue-600 font-medium">{currentQty}</span>
+                                  </span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <GitCompare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p className="text-lg">No changes from default configuration</p>
+                <p className="text-sm">This product is using the default settings.</p>
+              </div>
+            )}
+          </div>
+          
+          <div className="p-6 border-t border-gray-200 bg-gray-50">
+            <button
+              onClick={() => setShowCompareModal(false)}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              Close Comparison
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setIsConfigLoading(true);
+    setConfigError(null);
+    setUploadSuccess(false);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const uploadedConfig = JSON.parse(e.target.result);
+        
+        if (validateConfigStructure(uploadedConfig)) {
+          // Update the base config data
+          setConfigData(uploadedConfig);
+          
+          // If the uploaded config has saved selections, restore them
+          if (uploadedConfig.currentConfiguration) {
+            setConfiguration(uploadedConfig.currentConfiguration);
+          } else {
+            // Reset to empty configuration
+            resetConfiguration(uploadedConfig);
+          }
+          
+          setConfigError(null);
+          setUploadSuccess(true);
+          
+          setTimeout(() => setUploadSuccess(false), 3000);
+        } else {
+          setConfigError('Invalid configuration file structure. Please upload a valid JSON configuration file.');
+        }
+      } catch (error) {
+        setConfigError('Failed to parse JSON file: ' + error.message);
+      } finally {
+        setIsConfigLoading(false);
+        if (event.target) {
+          event.target.value = '';
+        }
+      }
+    };
+
+    reader.onerror = () => {
+      setConfigError('Failed to read the file. Please try again.');
+      setIsConfigLoading(false);
+    };
+
+    reader.readAsText(file);
+  };
+
+  const validateConfigStructure = (config) => {
+    if (!config || typeof config !== 'object') return false;
+    
+    const requiredKeys = ['productInfo', 'steps', 'products'];
+    const hasRequiredKeys = requiredKeys.every(key => key in config);
+    
+    if (!hasRequiredKeys) return false;
+    
+    if (!config.productInfo || typeof config.productInfo !== 'object') return false;
+    if (!Array.isArray(config.steps)) return false;
+    if (!config.products || typeof config.products !== 'object') return false;
+    
+    return true;
+  };
+
+  const resetConfiguration = (newConfigData = configData) => {
+    const newConfig = {};
+    if (newConfigData.steps) {
+      newConfigData.steps.forEach(step => {
+        newConfig[step.id] = { selections: [], configured: false };
+      });
+    }
+    setConfiguration(newConfig);
+    
+    const firstStep = newConfigData?.steps?.[0]?.id || 'node';
+    setCurrentStep(firstStep);
+    setSelectedProductIndex(null);
+    setCurrentCategory('hardware');
+  };
+
+  const downloadConfiguration = () => {
+    try {
+      // Create a complete configuration object with both structure and current selections
+      const fullConfig = {
+        ...configData,
+        currentConfiguration: configuration,
+        timestamp: new Date().toISOString(),
+        totalPrice: (() => {
+          let total = 0;
+          Object.entries(configuration).forEach(([category, config]) => {
+            if (config.selections) {
+              total += config.selections.reduce((sum, selection) => {
+                return sum + calculatePrice(selection.product, selection.config, selection.quantity);
+              }, 0);
+            }
+          });
+          return total;
+        })()
+      };
+      
+      const dataStr = JSON.stringify(fullConfig, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const exportFileDefaultName = `infrastructure-config-${new Date().toISOString().split('T')[0]}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.href = url;
+      linkElement.download = exportFileDefaultName;
+      document.body.appendChild(linkElement);
+      linkElement.click();
+      document.body.removeChild(linkElement);
+      
+      // Clean up the URL object
+      URL.revokeObjectURL(url);
+      
+      // Show success message
+      setUploadSuccess(true);
+      setTimeout(() => setUploadSuccess(false), 3000);
+    } catch (error) {
+      setConfigError('Failed to download configuration: ' + error.message);
+      setTimeout(() => setConfigError(null), 5000);
+    }
+  };
+
+  const resetToDefault = () => {
+    if (window.confirm('Are you sure you want to reset to default configuration? This will lose all current selections and data.')) {
+      // Reset everything to initial state
+      setConfigData(defaultConfigData);
+      setConfiguration({
+        node: { selections: [], configured: false },
+        chassis: { selections: [], configured: false },
+        'optional-software': { selections: [], configured: false },
+        'required-software': { selections: [], configured: false },
+        services: { selections: [], configured: false }
+      });
+      
+      setCurrentStep('node');
+      setSelectedProductIndex(null);
+      setCurrentCategory('hardware');
+      setShowMessages(false);
+      setShowConfigPanel(false);
+      setConfigError(null);
+      setUploadSuccess(false);
+      
+      // Show confirmation
+      setUploadSuccess(true);
+      setTimeout(() => setUploadSuccess(false), 3000);
+    }
   };
 
   const ProductSelector = ({ category }) => {
@@ -763,6 +1040,11 @@ const InfrastructureConfigurator = () => {
         modulesByCategory[cat].push([moduleId, module]);
       });
 
+      const availableCategories = Object.keys(modulesByCategory);
+      if (availableCategories.length > 0 && !availableCategories.includes(currentCategory)) {
+        setCurrentCategory(availableCategories[0]);
+      }
+
       return (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
@@ -778,299 +1060,213 @@ const InfrastructureConfigurator = () => {
                 {selection.product.name}
               </span>
             </div>
-            
-            <div className="flex items-center space-x-4">
-              {(() => {
-                const messages = getAllMessages();
-                const errors = messages.filter(m => m.type === 'error').length;
-                const warnings = messages.filter(m => m.type === 'warning').length;
-                const infos = messages.filter(m => m.type === 'info').length;
-                
-                if (errors > 0 || warnings > 0 || infos > 0) {
-                  return (
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowMessages(!showMessages)}
-                        className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                          errors > 0 
-                            ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200' 
-                            : warnings > 0
-                            ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-200'
-                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200'
-                        }`}
-                      >
-                        {errors > 0 ? (
-                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                        ) : warnings > 0 ? (
-                          <div className="w-2 h-2 bg-yellow-500 rounded-full" />
-                        ) : (
-                          <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                        )}
-                        <span>
-                          {errors > 0 ? `${errors} issue${errors !== 1 ? 's' : ''}` : 
-                           warnings > 0 ? `${warnings} warning${warnings !== 1 ? 's' : ''}` :
-                           `${infos} info`}
-                        </span>
-                        {showMessages ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      </button>
-
-                      {showMessages && (
-                        <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                          <div className="p-3 border-b border-gray-100">
-                            <h3 className="text-sm font-medium text-gray-900">
-                              {errors > 0 ? 'Issues to Fix' : warnings > 0 ? 'Warnings' : 'Information'}
-                            </h3>
-                          </div>
-                          <div className="max-h-64 overflow-y-auto">
-                            {messages.slice(0, 6).map((message, index) => (
-                              <div
-                                key={index}
-                                className="p-3 hover:bg-gray-50 border-b border-gray-50 last:border-b-0"
-                              >
-                                <div className="flex items-start space-x-3">
-                                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                                    message.type === 'error' ? 'bg-red-500' : 
-                                    message.type === 'warning' ? 'bg-yellow-500' :
-                                    'bg-blue-500'
-                                  }`} />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium text-gray-900 truncate">
-                                      {message.title}
-                                    </div>
-                                    <div className="text-xs text-gray-600 mt-0.5">
-                                      {message.message}
-                                    </div>
-                                    {message.type !== 'info' && (
-                                      <button
-                                        onClick={() => {
-                                          setCurrentStep(message.category);
-                                          setShowMessages(false);
-                                        }}
-                                        className="text-xs text-blue-600 hover:text-blue-800 mt-1 font-medium"
-                                      >
-                                        {message.type === 'error' ? 'Fix now →' : 'Review →'}
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-            </div>
           </div>
 
-          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-            {(configData.categories || ['hardware', 'software', 'services']).map(cat => (
-              <button
-                key={cat}
-                onClick={() => setCurrentCategory(cat)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors capitalize ${
-                  currentCategory === cat
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+          {Object.keys(modulesByCategory).length > 0 && (
+            <div className="bg-white rounded-lg border shadow-sm">
+              <div className="flex border-b bg-gray-50 rounded-t-lg">
+                {(configData.categories || ['hardware', 'software', 'services']).filter(cat => modulesByCategory[cat]).map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setCurrentCategory(cat)}
+                    className={`flex-1 px-6 py-4 text-sm font-medium transition-colors capitalize border-b-2 ${
+                      currentCategory === cat
+                        ? 'text-blue-600 border-blue-600 bg-white'
+                        : 'text-gray-600 hover:text-gray-900 border-transparent hover:bg-gray-100'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              
+              <div className="p-6">
+                <div className="space-y-8">
+                  {modulesByCategory[currentCategory]?.map(([moduleId, module]) => (
+                    <div key={moduleId} className="space-y-4">
+                      <div className="border-b border-gray-200 pb-3">
+                        <h4 className="text-lg font-semibold text-gray-900">
+                          {module.label}
+                          {module.required && <span className="text-red-500 ml-1">*</span>}
+                        </h4>
+                        <p className="text-sm text-gray-600 mt-1">{module.description}</p>
+                      </div>
 
-          <div className="border rounded-lg p-6 bg-gray-50">
-            <div className="space-y-6">
-              {modulesByCategory[currentCategory]?.map(([moduleId, module]) => (
-                <div key={moduleId} className="bg-white rounded-lg border p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h4 className="text-lg font-medium text-gray-900">
-                        {module.label}
-                        {module.required && <span className="text-red-500 ml-1">*</span>}
-                      </h4>
-                      <p className="text-sm text-gray-600 mt-1">{module.description}</p>
-                    </div>
-                  </div>
-
-                  {module.type === 'single-select' && (
-                    <div className="space-y-3">
-                      {module.options.map(option => (
-                        <label key={option.id} className="block">
-                          <div className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                            selection.config[moduleId] === option.id 
-                              ? 'border-blue-500 bg-blue-50' 
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}>
-                            <div className="flex items-center">
-                              <input
-                                type="radio"
-                                name={`${selectedProductIndex}-${moduleId}`}
-                                value={option.id}
-                                checked={selection.config[moduleId] === option.id}
-                                onChange={(e) => updateSelection(selectedProductIndex, {
-                                  config: { ...selection.config, [moduleId]: e.target.value }
-                                })}
-                                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                              />
-                              <div className="ml-3 flex-1">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <div className="font-medium text-gray-900">{option.label}</div>
-                                    <div className="text-sm text-gray-600">{option.description}</div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="font-semibold text-green-600">
-                                      {option.price === 0 ? 'Included' : `+${option.price.toLocaleString()}`}
+                      <div className="space-y-3">
+                        {module.type === 'single-select' && module.options.map(option => (
+                          <label key={option.id} className="block">
+                            <div className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-sm ${
+                              selection.config[moduleId] === option.id 
+                                ? 'border-blue-500 bg-blue-50 shadow-sm' 
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}>
+                              <div className="flex items-start">
+                                <input
+                                  type="radio"
+                                  name={`${selectedProductIndex}-${moduleId}`}
+                                  value={option.id}
+                                  checked={selection.config[moduleId] === option.id}
+                                  onChange={(e) => updateSelection(selectedProductIndex, {
+                                    config: { ...selection.config, [moduleId]: e.target.value }
+                                  })}
+                                  className="w-4 h-4 text-blue-600 focus:ring-blue-500 mt-1"
+                                />
+                                <div className="ml-4 flex-1">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <div className="font-medium text-gray-900">{option.label}</div>
+                                      <div className="text-sm text-gray-600 mt-1">{option.description}</div>
+                                    </div>
+                                    <div className="text-right ml-4">
+                                      <div className="font-semibold text-green-600">
+                                        {option.price === 0 ? 'Included' : `+$${option.price.toLocaleString()}`}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                                {option.details && (
-                                  <div className="mt-2 text-xs text-gray-500">
-                                    <div className="flex flex-wrap gap-2">
+                                  {option.details && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
                                       {option.details.map((detail, idx) => (
-                                        <span key={idx} className="bg-gray-100 px-2 py-1 rounded">
+                                        <span key={idx} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
                                           {detail}
                                         </span>
                                       ))}
                                     </div>
-                                  </div>
-                                )}
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  )}
+                          </label>
+                        ))}
 
-                  {module.type === 'multi-select-quantity' && (
-                    <div className="space-y-4">
-                      {module.options.map(option => {
-                        const currentSelection = (selection.config[moduleId] || []).find(s => s.optionId === option.id);
-                        const quantity = currentSelection?.quantity || 0;
-                        
-                        return (
-                          <div key={option.id} className={`border rounded-lg p-4 transition-colors ${
-                            quantity > 0 ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                          }`}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="font-medium text-gray-900">{option.label}</div>
-                                <div className="text-sm text-gray-600">{option.description}</div>
-                                {option.details && (
-                                  <div className="mt-2 text-xs text-gray-500">
-                                    <div className="flex flex-wrap gap-2">
+                        {module.type === 'multi-select-quantity' && module.options.map(option => {
+                          const currentSelection = (selection.config[moduleId] || []).find(s => s.optionId === option.id);
+                          const quantity = currentSelection?.quantity || 0;
+                          
+                          return (
+                            <div key={option.id} className={`border rounded-lg p-4 transition-all ${
+                              quantity > 0 ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-gray-200'
+                            }`}>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="font-medium text-gray-900">{option.label}</div>
+                                  <div className="text-sm text-gray-600 mt-1">{option.description}</div>
+                                  {option.details && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
                                       {option.details.map((detail, idx) => (
-                                        <span key={idx} className="bg-gray-100 px-2 py-1 rounded">
+                                        <span key={idx} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
                                           {detail}
                                         </span>
                                       ))}
                                     </div>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <div className="flex items-center space-x-3 ml-4">
-                                <div className="text-sm font-semibold text-green-600">
-                                  ${option.price.toLocaleString()}/each
+                                  )}
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                  <button
-                                    onClick={() => {
-                                      const newQty = Math.max(0, quantity - 1);
-                                      const moduleConfig = selection.config[moduleId] || [];
-                                      let newModuleConfig;
-                                      
-                                      if (newQty === 0) {
-                                        newModuleConfig = moduleConfig.filter(s => s.optionId !== option.id);
-                                      } else {
+                                
+                                <div className="flex items-center space-x-4 ml-6">
+                                  <div className="text-right">
+                                    <div className="text-sm font-semibold text-green-600">
+                                      ${option.price.toLocaleString()}/each
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      Max: {option.maxQuantity}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <button
+                                      onClick={() => {
+                                        const newQty = Math.max(0, quantity - 1);
+                                        const moduleConfig = selection.config[moduleId] || [];
+                                        let newModuleConfig;
+                                        
+                                        if (newQty === 0) {
+                                          newModuleConfig = moduleConfig.filter(s => s.optionId !== option.id);
+                                        } else {
+                                          const existingIndex = moduleConfig.findIndex(s => s.optionId === option.id);
+                                          if (existingIndex >= 0) {
+                                            newModuleConfig = [...moduleConfig];
+                                            newModuleConfig[existingIndex] = { ...newModuleConfig[existingIndex], quantity: newQty };
+                                          }
+                                        }
+                                        
+                                        updateSelection(selectedProductIndex, {
+                                          config: { ...selection.config, [moduleId]: newModuleConfig }
+                                        });
+                                      }}
+                                      disabled={quantity === 0}
+                                      className="w-8 h-8 flex items-center justify-center bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded border border-gray-300 text-sm"
+                                    >
+                                      <Minus className="w-4 h-4" />
+                                    </button>
+                                    <span className="w-12 text-center font-medium text-lg">{quantity}</span>
+                                    <button
+                                      onClick={() => {
+                                        const newQty = Math.min(option.maxQuantity, quantity + 1);
+                                        const moduleConfig = selection.config[moduleId] || [];
+                                        let newModuleConfig;
+                                        
                                         const existingIndex = moduleConfig.findIndex(s => s.optionId === option.id);
                                         if (existingIndex >= 0) {
                                           newModuleConfig = [...moduleConfig];
                                           newModuleConfig[existingIndex] = { ...newModuleConfig[existingIndex], quantity: newQty };
+                                        } else {
+                                          newModuleConfig = [...moduleConfig, { optionId: option.id, quantity: newQty }];
                                         }
-                                      }
-                                      
-                                      updateSelection(selectedProductIndex, {
-                                        config: { ...selection.config, [moduleId]: newModuleConfig }
-                                      });
-                                    }}
-                                    disabled={quantity === 0}
-                                    className="w-8 h-8 flex items-center justify-center bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 rounded text-sm"
-                                  >
-                                    <Minus className="w-4 h-4" />
-                                  </button>
-                                  <span className="w-12 text-center font-medium">{quantity}</span>
-                                  <button
-                                    onClick={() => {
-                                      const newQty = Math.min(option.maxQuantity, quantity + 1);
-                                      const moduleConfig = selection.config[moduleId] || [];
-                                      let newModuleConfig;
-                                      
-                                      const existingIndex = moduleConfig.findIndex(s => s.optionId === option.id);
-                                      if (existingIndex >= 0) {
-                                        newModuleConfig = [...moduleConfig];
-                                        newModuleConfig[existingIndex] = { ...newModuleConfig[existingIndex], quantity: newQty };
-                                      } else {
-                                        newModuleConfig = [...moduleConfig, { optionId: option.id, quantity: newQty }];
-                                      }
-                                      
-                                      updateSelection(selectedProductIndex, {
-                                        config: { ...selection.config, [moduleId]: newModuleConfig }
-                                      });
-                                    }}
-                                    disabled={quantity >= option.maxQuantity}
-                                    className="w-8 h-8 flex items-center justify-center bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 rounded text-sm"
-                                  >
-                                    <Plus className="w-4 h-4" />
-                                  </button>
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  Max: {option.maxQuantity}
+                                        
+                                        updateSelection(selectedProductIndex, {
+                                          config: { ...selection.config, [moduleId]: newModuleConfig }
+                                        });
+                                      }}
+                                      disabled={quantity >= option.maxQuantity}
+                                      className="w-8 h-8 flex items-center justify-center bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded border border-gray-300 text-sm"
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
+                              {quantity > 0 && (
+                                <div className="mt-3 pt-3 border-t border-blue-200">
+                                  <div className="text-right text-sm font-semibold text-blue-600">
+                                    Subtotal: ${(option.price * quantity).toLocaleString()}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            {quantity > 0 && (
-                              <div className="mt-2 pt-2 border-t border-blue-200">
-                                <div className="text-right text-sm font-semibold text-blue-600">
-                                  Subtotal: ${(option.price * quantity).toLocaleString()}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )) || (
+                    <div className="text-center py-12 text-gray-500">
+                      <p className="text-lg">No {currentCategory} modules available</p>
+                      <p className="text-sm mt-1">This product doesn't have {currentCategory} components to configure.</p>
                     </div>
                   )}
                 </div>
-              )) || (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No {currentCategory} modules available for this product.</p>
-                </div>
-              )}
+              </div>
             </div>
+          )}
             
-            <div className="mt-6 pt-6 border-t bg-white rounded p-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
+          <div className="p-6 bg-gray-50 border-t border-gray-200">
+            <div className="grid grid-cols-2 gap-6 text-sm">
+              <div className="space-y-2">
+                <div className="flex justify-between">
                   <span className="text-gray-600">Base Price:</span>
-                  <span className="font-medium ml-2">${selection.product.basePrice.toLocaleString()}</span>
+                  <span className="font-medium">${selection.product.basePrice.toLocaleString()}</span>
                 </div>
-                <div>
+                <div className="flex justify-between">
                   <span className="text-gray-600">Unit Price:</span>
-                  <span className="font-medium ml-2">${calculatePrice(selection.product, selection.config, 1).toLocaleString()}</span>
+                  <span className="font-medium">${calculatePrice(selection.product, selection.config, 1).toLocaleString()}</span>
                 </div>
-                <div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
                   <span className="text-gray-600">Quantity:</span>
-                  <span className="font-medium ml-2">{selection.quantity}</span>
+                  <span className="font-medium">{selection.quantity}</span>
                 </div>
-                <div className="text-right">
-                  <span className="text-lg font-bold text-green-600">
-                    Total: ${calculatePrice(selection.product, selection.config, selection.quantity).toLocaleString()}
+                <div className="flex justify-between text-lg">
+                  <span className="font-semibold text-gray-900">Total:</span>
+                  <span className="font-bold text-green-600">
+                    ${calculatePrice(selection.product, selection.config, selection.quantity).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -1104,6 +1300,13 @@ const InfrastructureConfigurator = () => {
                       className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
                     >
                       Configure
+                    </button>
+                    <button
+                      onClick={() => openCompareModal(selection)}
+                      className="px-3 py-2 bg-gray-100 text-gray-700 border border-gray-300 text-sm rounded hover:bg-gray-200 transition-colors"
+                      title="Compare with default"
+                    >
+                      <GitCompare className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => removeSelection(index)}
@@ -1210,19 +1413,105 @@ const InfrastructureConfigurator = () => {
               </div>
             </div>
             
-            <div className="flex items-center space-x-2">
-              <button 
-                onClick={() => setShowConfigPanel(!showConfigPanel)}
-                className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-              >
-                <FileText className="w-4 h-4" />
-                <span className="text-sm">Config</span>
-              </button>
+            <div className="flex items-center space-x-4">
+              {(() => {
+                const messages = getAllMessages();
+                const errors = messages.filter(m => m.type === 'error').length;
+                const warnings = messages.filter(m => m.type === 'warning').length;
+                const infos = messages.filter(m => m.type === 'info').length;
+                
+                if (errors > 0 || warnings > 0 || infos > 0) {
+                  return (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowMessages(!showMessages)}
+                        className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          errors > 0 
+                            ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200' 
+                            : warnings > 0
+                            ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-200'
+                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200'
+                        }`}
+                      >
+                        {errors > 0 ? (
+                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                        ) : warnings > 0 ? (
+                          <div className="w-2 h-2 bg-yellow-500 rounded-full" />
+                        ) : (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                        )}
+                        <span>
+                          {errors > 0 ? `${errors} issue${errors !== 1 ? 's' : ''}` : 
+                           warnings > 0 ? `${warnings} warning${warnings !== 1 ? 's' : ''}` :
+                           `${infos} info`}
+                        </span>
+                        {showMessages ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </button>
+
+                      {showMessages && (
+                        <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                          <div className="p-3 border-b border-gray-100">
+                            <h3 className="text-sm font-medium text-gray-900">
+                              {errors > 0 ? 'Issues to Fix' : warnings > 0 ? 'Warnings' : 'Information'}
+                            </h3>
+                          </div>
+                          <div className="max-h-64 overflow-y-auto">
+                            {messages.slice(0, 6).map((message, index) => (
+                              <div
+                                key={index}
+                                className="p-3 hover:bg-gray-50 border-b border-gray-50 last:border-b-0"
+                              >
+                                <div className="flex items-start space-x-3">
+                                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                                    message.type === 'error' ? 'bg-red-500' : 
+                                    message.type === 'warning' ? 'bg-yellow-500' :
+                                    'bg-blue-500'
+                                  }`} />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium text-gray-900 truncate">
+                                      {message.title}
+                                    </div>
+                                    <div className="text-xs text-gray-600 mt-0.5">
+                                      {message.message}
+                                    </div>
+                                    {message.type !== 'info' && (
+                                      <button
+                                        onClick={() => {
+                                          setCurrentStep(message.category);
+                                          setShowMessages(false);
+                                        }}
+                                        className="text-xs text-blue-600 hover:text-blue-800 mt-1 font-medium"
+                                      >
+                                        {message.type === 'error' ? 'Fix now →' : 'Review →'}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               
-              <button className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
-                <X className="w-4 h-4" />
-                <span className="text-sm">Exit Configuration</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={() => setShowConfigPanel(!showConfigPanel)}
+                  className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span className="text-sm">Config</span>
+                </button>
+                
+                <button className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
+                  <X className="w-4 h-4" />
+                  <span className="text-sm">Exit Configuration</span>
+                </button>
+              </div>
             </div>
           </div>
           
@@ -1243,7 +1532,7 @@ const InfrastructureConfigurator = () => {
                 <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">
                   <div className="flex items-center space-x-2">
                     <Check className="w-4 h-4" />
-                    <span>Configuration uploaded successfully!</span>
+                    <span>Operation completed successfully!</span>
                   </div>
                 </div>
               )}
@@ -1287,228 +1576,149 @@ const InfrastructureConfigurator = () => {
       </div>
 
       <div className="flex-1 flex">
-        <div className="w-80 bg-white border-r shadow-sm flex flex-col">
+        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+          <div className="p-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">Configuration Steps</h2>
+            <p className="text-sm text-gray-500 mt-1">Configure your infrastructure components</p>
+          </div>
+          
           <div className="flex-1 overflow-y-auto">
-            <nav className="p-4 space-y-1">
-              {(configData.steps || []).map((step) => {
+            <nav className="p-4 space-y-2">
+              {(configData.steps || []).map((step, stepIndex) => {
                 const isActive = currentStep === step.id;
                 const stepSelections = configuration[step.id]?.selections || [];
                 const stepStatus = getValidationStatus(step.id);
                 
                 return (
-                  <div key={step.id}>
+                  <div key={step.id} className={`rounded-lg border transition-colors ${
+                    isActive ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+                  }`}>
                     <button
-                      onClick={() => {
-                        setCurrentStep(step.id);
-                      }}
-                      className={`w-full flex items-center justify-between p-3 rounded transition-colors ${
-                        isActive
-                          ? 'bg-blue-50 text-blue-700'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
+                      onClick={() => setCurrentStep(step.id)}
+                      className="w-full p-4 text-left"
                     >
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium">{step.label}</span>
-                        {step.required && (
-                          <span className="text-red-400 text-sm">*</span>
-                        )}
-                        {stepSelections.length > 0 && (
-                          <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">
-                            {stepSelections.length}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {getStatusIcon(stepStatus)}
-                        <ChevronRight className="w-4 h-4" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                            isActive 
+                              ? 'bg-blue-600 text-white' 
+                              : stepSelections.length > 0
+                              ? 'bg-green-100 text-green-600'
+                              : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {stepIndex + 1}
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <span className={`text-sm font-medium ${
+                                isActive ? 'text-blue-900' : 'text-gray-900'
+                              }`}>
+                                {step.label}
+                              </span>
+                              {step.required && (
+                                <span className="text-red-400 text-xs">*</span>
+                              )}
+                            </div>
+                            {stepSelections.length > 0 && (
+                              <span className="text-xs text-gray-500">
+                                {stepSelections.length} item{stepSelections.length !== 1 ? 's' : ''} configured
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {getStatusIcon(stepStatus)}
+                          <ChevronRight className={`w-4 h-4 transition-transform ${
+                            isActive ? 'text-blue-600 rotate-90' : 'text-gray-400'
+                          }`} />
+                        </div>
                       </div>
                     </button>
 
                     {isActive && stepSelections.length > 0 && (
-                      <div className="ml-6 mt-2 space-y-2">
-                        {stepSelections.map((selection, index) => (
-                          <div key={index} className="bg-gray-50 rounded p-3 border text-xs">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium text-gray-800 truncate">
-                                {selection.product.name}
-                              </span>
-                              <div className="flex items-center space-x-1">
-                                <button
-                                  onClick={() => {
-                                    setSelectedProductIndex(index);
-                                  }}
-                                  className="text-blue-500 hover:text-blue-700 p-0.5"
-                                  title="Configure"
-                                >
-                                  <Settings className="w-3 h-3" />
-                                </button>
-                                <button
-                                  onClick={() => removeSelectionFromSidebar(step.id, index)}
-                                  className="text-red-500 hover:text-red-700 p-0.5"
-                                  title="Remove"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center justify-between text-xs">
-                              <div className="flex items-center space-x-1">
-                                <span className="text-gray-500">Qty:</span>
-                                <div className="flex items-center space-x-1">
+                      <div className="px-4 pb-4">
+                        <div className="space-y-2 mt-2">
+                          {stepSelections.map((selection, index) => (
+                            <div key={index} className="bg-white rounded-lg p-3 border border-blue-100">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-sm font-medium text-gray-900 truncate">
+                                    {selection.product.name}
+                                  </h4>
+                                  <div className="flex items-center space-x-4 mt-1">
+                                    <span className="text-xs text-gray-500">
+                                      Qty: {selection.quantity}
+                                    </span>
+                                    <span className="text-xs font-medium text-green-600">
+                                      ${calculatePrice(selection.product, selection.config, selection.quantity).toLocaleString()}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-1 ml-2">
                                   <button
-                                    onClick={() => {
-                                      const newQty = Math.max(1, selection.quantity - 1);
-                                      updateSelectionFromSidebar(step.id, index, { quantity: newQty });
-                                    }}
-                                    className="w-4 h-4 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-xs"
+                                    onClick={() => setSelectedProductIndex(index)}
+                                    className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded"
+                                    title="Configure"
                                   >
-                                    <Minus className="w-2 h-2" />
+                                    <Settings className="w-3 h-3" />
                                   </button>
-                                  <span className="font-medium w-6 text-center">{selection.quantity}</span>
                                   <button
-                                    onClick={() => {
-                                      updateSelectionFromSidebar(step.id, index, { quantity: selection.quantity + 1 });
-                                    }}
-                                    className="w-4 h-4 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-xs"
+                                    onClick={() => openCompareModal(selection)}
+                                    className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                                    title="Compare with default"
                                   >
-                                    <Plus className="w-2 h-2" />
+                                    <GitCompare className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => removeSelectionFromSidebar(step.id, index)}
+                                    className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 rounded"
+                                    title="Remove"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
                                   </button>
                                 </div>
                               </div>
-                              <span className="text-green-600 font-medium text-xs">
-                                ${calculatePrice(selection.product, selection.config, selection.quantity).toLocaleString()}
-                              </span>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
                 );
               })}
             </nav>
+          </div>
 
-            <div className="p-3 border-t bg-gray-50">
-              {(() => {
-                const categoryTotal = configuration[currentStep]?.selections?.reduce((sum, selection) => {
-                  return sum + calculatePrice(selection.product, selection.config, selection.quantity);
-                }, 0) || 0;
-                
-                if (categoryTotal > 0) {
-                  return (
-                    <div className="flex justify-between items-center text-xs font-medium">
-                      <span className="text-gray-700 capitalize">{currentStep} Total:</span>
-                      <span className="text-green-600">${categoryTotal.toLocaleString()}</span>
+          <div className="p-4 border-t border-gray-200 bg-gray-50">
+            {(() => {
+              const categoryTotal = configuration[currentStep]?.selections?.reduce((sum, selection) => {
+                return sum + calculatePrice(selection.product, selection.config, selection.quantity);
+              }, 0) || 0;
+              
+              if (categoryTotal > 0) {
+                return (
+                  <div className="text-center">
+                    <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                      {currentStep} Total
                     </div>
-                  );
-                }
-                return null;
-              })()}
-            </div>
+                    <div className="text-lg font-bold text-green-600">
+                      ${categoryTotal.toLocaleString()}
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div className="text-center text-sm text-gray-500">
+                  No items configured yet
+                </div>
+              );
+            })()}
           </div>
         </div>
 
         <div className="flex-1 bg-white">
           <div className="p-6">
             <div className="max-w-none">
-              {/* Header with Messages - only show "Available Products" if no products added and not in configuration mode */}
-              {selectedProductIndex === null && (
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-4">
-                    {configuration[currentStep]?.selections?.length === 0 && (
-                      <h2 className="text-xl font-semibold text-gray-900">Available Products</h2>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    {(() => {
-                      const messages = getAllMessages();
-                      const errors = messages.filter(m => m.type === 'error').length;
-                      const warnings = messages.filter(m => m.type === 'warning').length;
-                      const infos = messages.filter(m => m.type === 'info').length;
-                      
-                      if (errors > 0 || warnings > 0 || infos > 0) {
-                        return (
-                          <div className="relative">
-                            <button
-                              onClick={() => setShowMessages(!showMessages)}
-                              className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                                errors > 0 
-                                  ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200' 
-                                  : warnings > 0
-                                  ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-200'
-                                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200'
-                              }`}
-                            >
-                              {errors > 0 ? (
-                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                              ) : warnings > 0 ? (
-                                <div className="w-2 h-2 bg-yellow-500 rounded-full" />
-                              ) : (
-                                <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                              )}
-                              <span>
-                                {errors > 0 ? `${errors} issue${errors !== 1 ? 's' : ''}` : 
-                                 warnings > 0 ? `${warnings} warning${warnings !== 1 ? 's' : ''}` :
-                                 `${infos} info`}
-                              </span>
-                              {showMessages ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                            </button>
-
-                            {showMessages && (
-                              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                                <div className="p-3 border-b border-gray-100">
-                                  <h3 className="text-sm font-medium text-gray-900">
-                                    {errors > 0 ? 'Issues to Fix' : warnings > 0 ? 'Warnings' : 'Information'}
-                                  </h3>
-                                </div>
-                                <div className="max-h-64 overflow-y-auto">
-                                  {messages.slice(0, 6).map((message, index) => (
-                                    <div
-                                      key={index}
-                                      className="p-3 hover:bg-gray-50 border-b border-gray-50 last:border-b-0"
-                                    >
-                                      <div className="flex items-start space-x-3">
-                                        <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                                          message.type === 'error' ? 'bg-red-500' : 
-                                          message.type === 'warning' ? 'bg-yellow-500' :
-                                          'bg-blue-500'
-                                        }`} />
-                                        <div className="flex-1 min-w-0">
-                                          <div className="text-sm font-medium text-gray-900 truncate">
-                                            {message.title}
-                                          </div>
-                                          <div className="text-xs text-gray-600 mt-0.5">
-                                            {message.message}
-                                          </div>
-                                          {message.type !== 'info' && (
-                                            <button
-                                              onClick={() => {
-                                                setCurrentStep(message.category);
-                                                setShowMessages(false);
-                                              }}
-                                              className="text-xs text-blue-600 hover:text-blue-800 mt-1 font-medium"
-                                            >
-                                              {message.type === 'error' ? 'Fix now →' : 'Review →'}
-                                            </button>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                </div>
-              )}
-              
               <ProductSelector category={currentStep} />
             </div>
           </div>
@@ -1521,6 +1731,8 @@ const InfrastructureConfigurator = () => {
         onApplyConfiguration={handleAIApplyConfiguration}
         onNavigateToStep={handleAINavigateToStep}
       />
+      
+      <CompareModal />
     </div>
   );
 };
