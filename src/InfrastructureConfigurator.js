@@ -19,7 +19,9 @@ import {
   Minimize2,
   GitCompare,
   ArrowRight,
-  List
+  List,
+  MoreVertical,
+  Eye
 } from 'lucide-react';
 
 const AIConfigurationAssistant = ({ 
@@ -472,6 +474,7 @@ const InfrastructureConfigurator = () => {
   const [compareData, setCompareData] = useState(null);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [expandedSummaryItems, setExpandedSummaryItems] = useState({});
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
   
   const fileInputRef = useRef(null);
   
@@ -1826,12 +1829,12 @@ const InfrastructureConfigurator = () => {
                     <div className="relative">
                       <button
                         onClick={() => setShowMessages(!showMessages)}
-                        className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                        className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                           errors > 0 
-                            ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200' 
+                            ? 'bg-red-100 text-red-700 hover:bg-red-200' 
                             : warnings > 0
-                            ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-200'
-                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200'
+                            ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                         }`}
                       >
                         {errors > 0 ? (
@@ -1899,27 +1902,53 @@ const InfrastructureConfigurator = () => {
                 return null;
               })()}
               
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-3">
                 <button 
                   onClick={() => setShowSummaryModal(true)}
-                  className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  <List className="w-4 h-4" />
-                  <span className="text-sm">Summary</span>
+                  <Eye className="w-4 h-4" />
+                  <span className="text-sm">View Summary</span>
                 </button>
                 
-                <button 
-                  onClick={() => setShowConfigPanel(!showConfigPanel)}
-                  className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                >
-                  <FileText className="w-4 h-4" />
-                  <span className="text-sm">Config</span>
-                </button>
-                
-                <button className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
-                  <X className="w-4 h-4" />
-                  <span className="text-sm">Exit Configuration</span>
-                </button>
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowActionsMenu(!showActionsMenu)}
+                    className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+                  
+                  {showActionsMenu && (
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                      <div className="py-1">
+                        <button
+                          onClick={() => {
+                            setShowConfigPanel(!showConfigPanel);
+                            setShowActionsMenu(false);
+                          }}
+                          className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <FileText className="w-4 h-4" />
+                          <span>Manage Config</span>
+                        </button>
+                        <hr className="my-1" />
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to exit? Any unsaved changes will be lost.')) {
+                              // Handle exit logic here
+                            }
+                            setShowActionsMenu(false);
+                          }}
+                          className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                        >
+                          <X className="w-4 h-4" />
+                          <span>Exit Configuration</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
