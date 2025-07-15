@@ -21,7 +21,9 @@ import {
   ArrowRight,
   List,
   MoreVertical,
-  Eye
+  Eye,
+  Menu,
+  ChevronLeft
 } from 'lucide-react';
 
 const AIConfigurationAssistant = ({ 
@@ -475,6 +477,8 @@ const InfrastructureConfigurator = () => {
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [expandedSummaryItems, setExpandedSummaryItems] = useState({});
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [isSimpleMode, setIsSimpleMode] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   
   const fileInputRef = useRef(null);
   
@@ -626,6 +630,41 @@ const InfrastructureConfigurator = () => {
     const currentSelections = configuration[category]?.selections || [];
     const updated = currentSelections.filter((_, i) => i !== selectionIndex);
     updateConfiguration(category, updated);
+  };
+
+  const toggleSimpleMode = () => {
+    const newSimpleMode = !isSimpleMode;
+    setIsSimpleMode(newSimpleMode);
+    
+    if (newSimpleMode) {
+      // Auto-select Enterprise Node A with default configuration
+      const nodeProduct = configData.products['node']?.find(p => p.id === 'node-a');
+      if (nodeProduct) {
+        const defaultConfig = getDefaultConfig(nodeProduct);
+        const newSelection = {
+          productId: nodeProduct.id,
+          product: nodeProduct,
+          config: defaultConfig,
+          quantity: 1,
+          configured: true
+        };
+        
+        // Clear all existing configurations and set only the node
+        const simpleConfiguration = {
+          node: { selections: [newSelection], configured: true },
+          chassis: { selections: [], configured: false },
+          'optional-software': { selections: [], configured: false },
+          'required-software': { selections: [], configured: false },
+          services: { selections: [], configured: false }
+        };
+        
+        setConfiguration(simpleConfiguration);
+        setCurrentStep('node');
+        setSelectedProductIndex(0); // Auto-select the product for configuration
+      }
+    }
+    
+    setShowActionsMenu(false);
   };
 
   const validateModuleConfiguration = (product, config, moduleId, module) => {
@@ -1781,7 +1820,7 @@ const InfrastructureConfigurator = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      <div className="bg-white border-b">
+      <div className="bg-white border-b sticky top-0 z-40 shadow-sm">
         <div className="max-w-full px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-8">
@@ -1923,6 +1962,18 @@ const InfrastructureConfigurator = () => {
                     <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                       <div className="py-1">
                         <button
+                          onClick={toggleSimpleMode}
+                          className="flex items-center justify-between w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <span>{isSimpleMode ? 'Switch to Complex' : 'Switch to Simple'}</span>
+                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                            isSimpleMode ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
+                          }`}>
+                            {isSimpleMode && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                        </button>
+                        <hr className="my-1" />
+                        <button
                           onClick={() => {
                             setShowConfigPanel(!showConfigPanel);
                             setShowActionsMenu(false);
@@ -2014,148 +2065,223 @@ const InfrastructureConfigurator = () => {
       </div>
 
       <div className="flex-1 flex">
-        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-          <div className="p-4 border-b border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-900">Configuration Steps</h2>
-            <p className="text-sm text-gray-500 mt-1">Configure your infrastructure components</p>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto">
-            <nav className="p-4 space-y-2">
-              {(configData.steps || []).map((step, stepIndex) => {
-                const isActive = currentStep === step.id;
-                const stepSelections = configuration[step.id]?.selections || [];
-                const stepStatus = getValidationStatus(step.id);
-                
-                return (
-                  <div key={step.id} className={`rounded-lg border transition-colors ${
-                    isActive ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'
-                  }`}>
-                    <button
-                      onClick={() => setCurrentStep(step.id)}
-                      className="w-full p-4 text-left"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                            isActive 
-                              ? 'bg-blue-600 text-white' 
-                              : stepSelections.length > 0
-                              ? 'bg-green-100 text-green-600'
-                              : 'bg-gray-100 text-gray-500'
-                          }`}>
-                            {stepIndex + 1}
-                          </div>
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <span className={`text-sm font-medium ${
-                                isActive ? 'text-blue-900' : 'text-gray-900'
-                              }`}>
-                                {step.label}
-                              </span>
-                              {step.required && (
-                                <span className="text-red-400 text-xs">*</span>
-                              )}
+        {!isSimpleMode && (
+          <div className={`${isSidebarCollapsed ? 'w-16' : 'w-80'} bg-white border-r border-gray-200 flex flex-col transition-all duration-300`}>
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              {!isSidebarCollapsed && (
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Configuration Steps</h2>
+                  <p className="text-sm text-gray-500 mt-1">Configure your infrastructure components</p>
+                </div>
+              )}
+              <button
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+              <nav className={`${isSidebarCollapsed ? 'p-2' : 'p-4'} space-y-2`}>
+                {(configData.steps || []).map((step, stepIndex) => {
+                  const isActive = currentStep === step.id;
+                  const stepSelections = configuration[step.id]?.selections || [];
+                  const stepStatus = getValidationStatus(step.id);
+                  
+                  if (isSidebarCollapsed) {
+                    return (
+                      <div key={step.id} className="relative group">
+                        <button
+                          onClick={() => setCurrentStep(step.id)}
+                          className={`w-full p-3 rounded-lg transition-colors ${
+                            isActive ? 'bg-blue-600 text-white' : 'bg-gray-100 hover:bg-gray-200'
+                          }`}
+                          title={step.label}
+                        >
+                          <div className="flex flex-col items-center space-y-1">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                              isActive 
+                                ? 'bg-white text-blue-600' 
+                                : stepSelections.length > 0
+                                ? 'bg-green-100 text-green-600'
+                                : 'bg-gray-300 text-gray-600'
+                            }`}>
+                              {stepIndex + 1}
                             </div>
                             {stepSelections.length > 0 && (
-                              <span className="text-xs text-gray-500">
+                              <div className={`w-2 h-2 rounded-full ${
+                                isActive ? 'bg-white' : 'bg-green-500'
+                              }`} />
+                            )}
+                            <div className="flex items-center justify-center">
+                              {getStatusIcon(stepStatus)}
+                            </div>
+                          </div>
+                        </button>
+                        
+                        {/* Tooltip for collapsed state */}
+                        <div className="absolute left-full ml-2 top-0 z-50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                          <div className="bg-gray-900 text-white text-sm rounded-lg px-3 py-2 whitespace-nowrap">
+                            <div className="font-medium">{step.label}</div>
+                            {step.required && <div className="text-xs text-gray-300">Required</div>}
+                            {stepSelections.length > 0 && (
+                              <div className="text-xs text-gray-300">
                                 {stepSelections.length} item{stepSelections.length !== 1 ? 's' : ''} configured
-                              </span>
+                              </div>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          {getStatusIcon(stepStatus)}
-                          <ChevronRight className={`w-4 h-4 transition-transform ${
-                            isActive ? 'text-blue-600 rotate-90' : 'text-gray-400'
-                          }`} />
-                        </div>
                       </div>
-                    </button>
+                    );
+                  }
+                  
+                  return (
+                    <div key={step.id} className={`rounded-lg border transition-colors ${
+                      isActive ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+                    }`}>
+                      <button
+                        onClick={() => setCurrentStep(step.id)}
+                        className="w-full p-4 text-left"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                              isActive 
+                                ? 'bg-blue-600 text-white' 
+                                : stepSelections.length > 0
+                                ? 'bg-green-100 text-green-600'
+                                : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              {stepIndex + 1}
+                            </div>
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <span className={`text-sm font-medium ${
+                                  isActive ? 'text-blue-900' : 'text-gray-900'
+                                }`}>
+                                  {step.label}
+                                </span>
+                                {step.required && (
+                                  <span className="text-red-400 text-xs">*</span>
+                                )}
+                              </div>
+                              {stepSelections.length > 0 && (
+                                <span className="text-xs text-gray-500">
+                                  {stepSelections.length} item{stepSelections.length !== 1 ? 's' : ''} configured
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {getStatusIcon(stepStatus)}
+                            <ChevronRight className={`w-4 h-4 transition-transform ${
+                              isActive ? 'text-blue-600 rotate-90' : 'text-gray-400'
+                            }`} />
+                          </div>
+                        </div>
+                      </button>
 
-                    {isActive && stepSelections.length > 0 && (
-                      <div className="px-4 pb-4">
-                        <div className="space-y-2 mt-2">
-                          {stepSelections.map((selection, index) => (
-                            <div key={index} className="bg-white rounded-lg p-3 border border-blue-100">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-sm font-medium text-gray-900 truncate">
-                                    {selection.product.name}
-                                  </h4>
-                                  <div className="flex items-center space-x-4 mt-1">
-                                    <span className="text-xs text-gray-500">
-                                      Qty: {selection.quantity}
-                                    </span>
-                                    <span className="text-xs font-medium text-green-600">
-                                      ${calculatePrice(selection.product, selection.config, selection.quantity).toLocaleString()}
-                                    </span>
+                      {isActive && stepSelections.length > 0 && (
+                        <div className="px-4 pb-4">
+                          <div className="space-y-2 mt-2">
+                            {stepSelections.map((selection, index) => (
+                              <div key={index} className="bg-white rounded-lg p-3 border border-blue-100">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-sm font-medium text-gray-900 truncate">
+                                      {selection.product.name}
+                                    </h4>
+                                    <div className="flex items-center space-x-4 mt-1">
+                                      <span className="text-xs text-gray-500">
+                                        Qty: {selection.quantity}
+                                      </span>
+                                      <span className="text-xs font-medium text-green-600">
+                                        ${calculatePrice(selection.product, selection.config, selection.quantity).toLocaleString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-1 ml-2">
+                                    <button
+                                      onClick={() => setSelectedProductIndex(index)}
+                                      className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded"
+                                      title="Configure"
+                                    >
+                                      <Settings className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => openCompareModal(selection)}
+                                      className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                                      title="Compare with default"
+                                    >
+                                      <GitCompare className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => removeSelectionFromSidebar(step.id, index)}
+                                      className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 rounded"
+                                      title="Remove"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
                                   </div>
                                 </div>
-                                <div className="flex items-center space-x-1 ml-2">
-                                  <button
-                                    onClick={() => setSelectedProductIndex(index)}
-                                    className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded"
-                                    title="Configure"
-                                  >
-                                    <Settings className="w-3 h-3" />
-                                  </button>
-                                  <button
-                                    onClick={() => openCompareModal(selection)}
-                                    className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-                                    title="Compare with default"
-                                  >
-                                    <GitCompare className="w-3 h-3" />
-                                  </button>
-                                  <button
-                                    onClick={() => removeSelectionFromSidebar(step.id, index)}
-                                    className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 rounded"
-                                    title="Remove"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </nav>
+            </div>
+
+            {!isSidebarCollapsed && (
+              <div className="p-4 border-t border-gray-200 bg-gray-50">
+                {(() => {
+                  const categoryTotal = configuration[currentStep]?.selections?.reduce((sum, selection) => {
+                    return sum + calculatePrice(selection.product, selection.config, selection.quantity);
+                  }, 0) || 0;
+                  
+                  if (categoryTotal > 0) {
+                    return (
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                          {currentStep} Total
+                        </div>
+                        <div className="text-lg font-bold text-green-600">
+                          ${categoryTotal.toLocaleString()}
                         </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </nav>
-          </div>
-
-          <div className="p-4 border-t border-gray-200 bg-gray-50">
-            {(() => {
-              const categoryTotal = configuration[currentStep]?.selections?.reduce((sum, selection) => {
-                return sum + calculatePrice(selection.product, selection.config, selection.quantity);
-              }, 0) || 0;
-              
-              if (categoryTotal > 0) {
-                return (
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
-                      {currentStep} Total
+                    );
+                  }
+                  return (
+                    <div className="text-center text-sm text-gray-500">
+                      No items configured yet
                     </div>
-                    <div className="text-lg font-bold text-green-600">
-                      ${categoryTotal.toLocaleString()}
-                    </div>
-                  </div>
-                );
-              }
-              return (
-                <div className="text-center text-sm text-gray-500">
-                  No items configured yet
-                </div>
-              );
-            })()}
+                  );
+                })()}
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         <div className="flex-1 bg-white">
           <div className="p-6">
+            {isSimpleMode && (
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                    <Check className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-blue-900">Simple Configuration Mode</h3>
+                    <p className="text-sm text-blue-700">Enterprise Node A has been pre-configured with recommended settings. You can customize the options below.</p>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="max-w-none">
               <ProductSelector category={currentStep} />
             </div>
