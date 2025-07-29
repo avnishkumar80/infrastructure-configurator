@@ -544,6 +544,9 @@ const InfrastructureConfigurator = () => {
   const [configError, setConfigError] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   
+  const [expandedSummaryItems, setExpandedSummaryItems] = useState({});
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  
   const fileInputRef = useRef(null);
   
   const [configuration, setConfiguration] = useState({
@@ -846,6 +849,263 @@ const InfrastructureConfigurator = () => {
       setUploadSuccess(true);
       setTimeout(() => setUploadSuccess(false), 3000);
     }
+  };
+
+  const ConfigurationSummary = () => {
+    if (!showSummaryModal) return null;
+
+    const toggleExpanded = (key) => {
+      setExpandedSummaryItems(prev => ({
+        ...prev,
+        [key]: !prev[key]
+      }));
+    };
+
+    const generateSummaryData = () => {
+      const summaryData = [];
+      let grandTotal = 0;
+
+      configData.steps.forEach(step => {
+        const stepConfig = configuration[step.id];
+        if (stepConfig && stepConfig.selections.length > 0) {
+          let stepTotal = 0;
+          const stepData = {
+            id: step.id,
+            label: step.label,
+            required: step.required,
+            products: []
+          };
+
+          stepConfig.selections.forEach((selection, selectionIndex) => {
+            const productTotal = calculatePrice(selection.product, selection.config, selection.quantity);
+            stepTotal += productTotal;
+
+            const productData = {
+              id: `${step.id}-${selectionIndex}`,
+              name: selection.product.name,
+              description: selection.product.description,
+              quantity: selection.quantity,
+              basePrice: selection.product.basePrice,
+              totalPrice: productTotal,
+              modules: []
+            };
+
+            // Group modules by category
+            const modulesByCategory = {};
+            Object.entries(selection.product.modules || {}).forEach(([moduleId, module]) => {
+              const cat = module.category || 'hardware';
+              if (!modulesByCategory[cat]) {
+                modulesByCategory[cat] = [];
+              }
+              modulesByCategory[cat].push([moduleId, module]);
+            });
+
+            // Add module data
+            Object.entries(modulesByCategory).forEach(([category, modules]) => {
+              modules.forEach(([moduleId, module]) => {
+                const moduleConfig = selection.config[moduleId];
+                let modulePrice = 0;
+                let configValue = '';
+
+                if (module.type === 'single-select' && moduleConfig) {
+                  const selectedOption = module.options.find(opt => opt.id === moduleConfig);
+                  if (selectedOption) {
+                    modulePrice = selectedOption.price;
+                    configValue = selectedOption.label;
+                  }
+                } else if (module.type === 'multi-select-quantity' && moduleConfig) {
+                  const items = [];
+                  moduleConfig.forEach(sel => {
+                    const option = module.options.find(opt => opt.id === sel.optionId);
+                    if (option) {
+                      modulePrice += option.price * sel.quantity;
+                      items.push(`${sel.quantity}x ${option.label}`);
+                    }
+                  });
+                  configValue = items.length > 0 ? items.join(', ') : 'None';
+                }
+
+                productData.modules.push({
+                  id: moduleId,
+                  label: module.label,
+                  category,
+                  required: module.required,
+                  type: module.type,
+                  value: configValue || 'Not configured',
+                  price: modulePrice,
+                  details: module.type === 'multi-select-quantity' ? moduleConfig : null
+                });
+              });
+            });
+
+            stepData.products.push(productData);
+          });
+
+          stepData.totalPrice = stepTotal;
+          grandTotal += stepTotal;
+          summaryData.push(stepData);
+        }
+      });
+
+      return { summaryData, grandTotal };
+    };
+
+    const { summaryData, grandTotal } = generateSummaryData();
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full mx-4 max-h-[85vh] overflow-hidden flex flex-col">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <List className="w-6 h-6 text-blue-600" />
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Configuration Summary</h2>
+                  <p className="text-sm text-gray-600">Complete overview of your infrastructure setup</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSummaryModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6">
+            {summaryData.length > 0 ? (
+              <div className="space-y-6">
+                {summaryData.map((step) => (
+                  <div key={step.id} className="border rounded-lg overflow-hidden">
+                    <div 
+                      className="bg-gray-50 p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                      onClick={() => toggleExpanded(step.id)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          {expandedSummaryItems[step.id] ? 
+                            <ChevronDown className="w-5 h-5 text-gray-500" /> : 
+                            <ChevronRight className="w-5 h-5 text-gray-500" />
+                          }
+                          <div>
+                            <h3 className="font-semibold text-gray-900 flex items-center space-x-2">
+                              <span>{step.label}</span>
+                              {step.required && <span className="text-red-500 text-sm">*</span>}
+                            </h3>
+                            <p className="text-sm text-gray-600">{step.products.length} product{step.products.length !== 1 ? 's' : ''} configured</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold text-lg text-green-600">
+                            ${step.totalPrice.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {expandedSummaryItems[step.id] && (
+                      <div className="p-4 space-y-4">
+                        {step.products.map((product) => (
+                          <div key={product.id} className="border rounded-lg overflow-hidden">
+                            <div 
+                              className="bg-blue-50 p-4 cursor-pointer hover:bg-blue-100 transition-colors"
+                              onClick={() => toggleExpanded(product.id)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3">
+                                  {expandedSummaryItems[product.id] ? 
+                                    <ChevronDown className="w-4 h-4 text-blue-600" /> : 
+                                    <ChevronRight className="w-4 h-4 text-blue-600" />
+                                  }
+                                  <div>
+                                    <h4 className="font-medium text-blue-900">{product.name}</h4>
+                                    <p className="text-sm text-blue-700">
+                                      Quantity: {product.quantity} | Base: ${product.basePrice.toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-semibold text-green-600">
+                                    ${product.totalPrice.toLocaleString()}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {expandedSummaryItems[product.id] && (
+                              <div className="p-4 bg-white">
+                                <div className="space-y-3">
+                                  {/* Group modules by category */}
+                                  {['hardware', 'software', 'services'].map(category => {
+                                    const categoryModules = product.modules.filter(m => m.category === category);
+                                    if (categoryModules.length === 0) return null;
+
+                                    return (
+                                      <div key={category} className="space-y-2">
+                                        <h5 className="font-medium text-gray-700 capitalize text-sm border-b border-gray-200 pb-1">
+                                          {category} Configuration
+                                        </h5>
+                                        <div className="space-y-2 ml-4">
+                                          {categoryModules.map((module) => (
+                                            <div key={module.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                                              <div className="flex-1">
+                                                <div className="flex items-center space-x-2">
+                                                  <span className="font-medium text-gray-800 text-sm">{module.label}</span>
+                                                  {module.required && <span className="text-red-400 text-xs">*</span>}
+                                                </div>
+                                                <div className="text-sm text-gray-600 mt-1">
+                                                  {module.value}
+                                                </div>
+                                              </div>
+                                              <div className="text-right">
+                                                <div className="text-sm font-medium text-green-600">
+                                                  {module.price === 0 ? 'Included' : `${module.price.toLocaleString()}`}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <List className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Configuration Yet</h3>
+                <p>Start adding products to see your configuration summary here.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="p-6 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Total Configuration Cost</h3>
+                <p className="text-sm text-gray-600">
+                  {summaryData.length} step{summaryData.length !== 1 ? 's' : ''} configured
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-green-600">
+                  ${grandTotal.toLocaleString()}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const MessageCenter = () => {
@@ -1537,6 +1797,23 @@ const InfrastructureConfigurator = () => {
 
                         <div className="border-t border-gray-200 pt-3">
                           <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">
+                            View & Analysis
+                          </label>
+                          
+                          <button
+                            onClick={() => {
+                              setShowSummaryModal(true);
+                              setShowConfigPanel(false);
+                            }}
+                            className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-green-600 text-white text-sm font-medium rounded transition-colors hover:bg-green-700 mb-3"
+                          >
+                            <Eye className="w-4 h-4" />
+                            <span>View Configuration Summary</span>
+                          </button>
+                        </div>
+
+                        <div className="border-t border-gray-200 pt-3">
+                          <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">
                             Chat & Display
                           </label>
                           
@@ -1638,6 +1915,7 @@ const InfrastructureConfigurator = () => {
       </div>
       
       <MessageCenter />
+      <ConfigurationSummary />
     </div>
   );
 };
