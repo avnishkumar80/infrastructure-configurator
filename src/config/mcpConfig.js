@@ -8,7 +8,7 @@ export const mcpConfig = {
   development: {
     transport: 'http',
     baseUrl: 'http://localhost:5000',
-    endpoint: '/mcp',
+    endpoint: '/',
     autoReconnect: true,
     reconnectDelay: 5000
   },

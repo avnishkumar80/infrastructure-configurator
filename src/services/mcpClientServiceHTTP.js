@@ -1,57 +1,70 @@
-import { getMCPServerUrl } from '../config/serverConfig.js';
+// Optional: resolve server URL from env/config
+function getMCPServerUrl() {
+  if (typeof process !== 'undefined' && process.env && process.env.MCP_SERVER_URL) {
+    return process.env.MCP_SERVER_URL;
+  }
+  return 'http://192.168.4.47:5000';
+}
 
-/**
- * MCP Client Service with HTTP Transport
- * Native MCP protocol (JSON-RPC 2.0) over HTTP instead of WebSocket
- */
 class MCPClientServiceHTTP {
-  constructor() {
+  constructor({ baseUrl = getMCPServerUrl(), basePath = '/mcp' } = {}) {
     this.isConnected = false;
     this.availableTools = [];
-    // Get server URL from configuration
-    this.baseUrl = getMCPServerUrl();
+    this.baseUrl = String(baseUrl || '').replace(/\/+$/, '');
+    this.basePath = String(basePath || '/mcp').replace(/\/+$/, '');
     this.requestId = 0;
     this.serverInfo = null;
-    this.clientCapabilities = {
-      tools: {}
-    };
+    this.clientCapabilities = { tools: {} };
+
+    // cache working endpoint for RPC calls
+    this.workingEndpoint = null; // e.g., '/mcp' or '/mcp/initialize' just for init
   }
+
+  getNextRequestId() { return ++this.requestId; }
+  _url(endpoint) { return `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`; }
 
   async connect(serverConfig) {
     try {
       console.log('🔌 Connecting to MCP server via HTTP transport...');
-      
-      // Store config for reconnection
       this.connectionConfig = serverConfig;
-      
-      // Send MCP initialization via HTTP
-      const initResponse = await this.sendMCPRequest({
-        jsonrpc: "2.0",
-        id: this.getNextRequestId(),
-        method: "initialize",
-        params: {
-          protocolVersion: "2024-11-05",
-          capabilities: this.clientCapabilities,
-          clientInfo: {
-            name: "infrastructure-configurator",
-            version: "1.0.0"
-          }
-        }
-      });
 
-      if (initResponse && initResponse.result) {
-        this.serverInfo = initResponse.result.serverInfo;
-        console.log('✅ MCP initialization successful:', this.serverInfo);
-        
-        // Get available tools
-        await this.refreshAvailableTools();
-        
-        this.isConnected = true;
-        console.log(`📋 Connected with ${this.availableTools.length} tools available`);
-        return true;
-      } else {
+      // Try single-endpoint JSON-RPC at /mcp first, then per-method /mcp/initialize
+      const endpointsForInit = [this.basePath || '/mcp', `${this.basePath || '/mcp'}/initialize`];
+
+      const initReq = {
+        jsonrpc: '2.0',
+        id: this.getNextRequestId(),
+        method: 'initialize',
+        params: {
+          protocolVersion: '2024-11-05',
+          capabilities: this.clientCapabilities,
+          clientInfo: { name: 'infrastructure-configurator', version: '1.0.0' }
+        }
+      };
+
+      const initResp = await this._sendWithDiscovery(initReq, endpointsForInit);
+
+      // Surface RPC error explicitly
+      if (initResp && initResp.error) {
+        throw new Error(`Initialize error: ${initResp.error.message || JSON.stringify(initResp.error)}`);
+      }
+
+      // Accept JSON-RPC envelope or a "flattened" result
+      const result = initResp?.result || (initResp?.serverInfo ? initResp : null);
+      if (!result) {
+        console.warn('Initialization envelope did not contain result. Full response:', initResp);
         throw new Error('Invalid initialization response');
       }
+
+      this.serverInfo = result.serverInfo || null;
+      console.log('✅ MCP initialization successful:', this.serverInfo);
+
+      // Mark connected before fetching tools
+      this.isConnected = true;
+
+      await this.refreshAvailableTools();
+      console.log(`📋 Connected with ${this.availableTools.length} tools available`);
+      return true;
     } catch (error) {
       console.error('❌ Failed to connect to MCP server via HTTP:', error);
       this.isConnected = false;
@@ -60,139 +73,135 @@ class MCPClientServiceHTTP {
   }
 
   async refreshAvailableTools() {
-    if (!this.isConnected) {
-      console.warn('Cannot refresh tools - MCP client not connected');
-      return [];
-    }
-    
     try {
-      const response = await this.sendMCPRequest({
-        jsonrpc: "2.0",
+      const resp = await this.sendMCPRequest({
+        jsonrpc: '2.0',
         id: this.getNextRequestId(),
-        method: "tools/list",
+        method: 'tools/list',
         params: {}
       });
-      
-      if (response && response.result && response.result.tools) {
-        this.availableTools = response.result.tools;
-        console.log('🔄 Refreshed available MCP tools:', this.availableTools.map(t => t.name));
-        return this.availableTools;
-      } else {
-        console.warn('Invalid tools/list response:', response);
+
+      if (resp?.error) {
+        console.warn('tools/list RPC error:', resp.error);
         return [];
       }
-    } catch (error) {
-      console.error('Failed to get tools from MCP server:', error);
+
+      const tools = resp?.result?.tools;
+      if (Array.isArray(tools)) {
+        this.availableTools = tools;
+        console.log('🔄 Refreshed available MCP tools:', this.availableTools.map(t => t.name));
+        return this.availableTools;
+      }
+
+      console.warn('Invalid tools/list response:', resp);
+      return [];
+    } catch (e) {
+      console.error('Failed to get tools from MCP server:', e);
       return [];
     }
   }
 
   async callTool(toolName, parameters = {}) {
-    if (!this.isConnected) {
-      throw new Error('MCP client not connected');
-    }
+    if (!this.isConnected) throw new Error('MCP client not connected');
 
-    try {
-      console.log(`🛠️ Calling MCP tool: ${toolName}`, parameters);
-      
-      const response = await this.sendMCPRequest({
-        jsonrpc: "2.0",
-        id: this.getNextRequestId(),
-        method: "tools/call",
-        params: {
-          name: toolName,
-          arguments: parameters
-        }
-      });
+    const resp = await this.sendMCPRequest({
+      jsonrpc: '2.0',
+      id: this.getNextRequestId(),
+      method: 'tools/call',
+      params: { name: toolName, arguments: parameters }
+    });
 
-      if (response && response.result) {
-        console.log(`✅ Tool ${toolName} executed successfully`);
-        
-        return {
-          success: true,
-          result: response.result.content || response.result,
-          toolName,
-          parameters
-        };
-      } else if (response && response.error) {
-        throw new Error(response.error.message || 'Tool execution failed');
-      } else {
-        throw new Error('Invalid tool call response');
-      }
-    } catch (error) {
-      console.error(`❌ Failed to call tool ${toolName}:`, error);
-      return {
-        success: false,
-        error: error.message,
-        toolName,
-        parameters
-      };
-    }
+    if (resp?.error) throw new Error(resp.error.message || 'Tool execution failed');
+
+    return {
+      success: true,
+      result: resp?.result?.content ?? resp?.result ?? resp,
+      toolName,
+      parameters
+    };
   }
+
+  // ---- Core transport helpers ----
 
   async sendMCPRequest(request) {
-    // Try different endpoint paths for your API structure
-    const endpointPaths = [
-      '/api/v1/mcp',        // Your API v1 + standard MCP
-      '/api/v1/jsonrpc',    // Your API v1 + JSON-RPC
-      '/api/v1/rpc',        // Your API v1 + RPC
-      '/api/v1',            // Your API v1 base
-      '/mcp',               // Fallback to standard
-    ];
+    // For post-init, prefer a single RPC endpoint at /mcp (common pattern)
+    const endpoints = [this.basePath || '/mcp'];
+    return await this._sendWithDiscovery(request, endpoints);
+  }
 
-    const contentTypes = [
-      'application/json',
-      'text/json',
-      'application/json; charset=utf-8'
-    ];
-
-    for (const endpoint of endpointPaths) {
-      for (const contentType of contentTypes) {
-        try {
-          console.log(`🔄 Testing: ${this.baseUrl}${endpoint} with Content-Type: ${contentType}`);
-          
-          const response = await fetch(`${this.baseUrl}${endpoint}`, {
-            method: 'POST',
-            headers: { 'Content-Type': contentType },
-            body: JSON.stringify(request)
-          });
-
-          console.log(`📝 Response: ${response.status} ${response.statusText}`);
-
-          if (response.ok) {
-            const data = await response.json();
-            console.log('✅ SUCCESS! Working endpoint:', endpoint, 'Content-Type:', contentType);
-            console.log('📦 Response:', data);
-            
-            // Update the working endpoint for future requests
-            this.workingEndpoint = endpoint;
-            this.workingContentType = contentType;
-            
-            return data;
-          } else {
-            const errorText = await response.text();
-            console.warn(`❌ ${endpoint} failed: ${response.status} - ${errorText}`);
-          }
-        } catch (error) {
-          console.warn(`❌ ${endpoint} error:`, error.message);
-        }
+  async _sendWithDiscovery(request, endpoints) {
+    // Try cached working endpoint first
+    if (this.workingEndpoint && endpoints.includes(this.workingEndpoint)) {
+      try {
+        return await this._postJsonRpc(this.workingEndpoint, request);
+      } catch (e) {
+        console.warn(`⚠️ Cached endpoint failed (${this.workingEndpoint}). Falling back...`, e.message);
       }
     }
 
-    throw new Error('All endpoint and content-type combinations failed for /api/v1/ structure');
+    const failures = [];
+    for (const ep of endpoints) {
+      try {
+        const data = await this._postJsonRpc(ep, request);
+        this.workingEndpoint = ep; // cache success
+        return data;
+      } catch (e) {
+        failures.push({ endpoint: ep, error: e.message });
+        console.warn(`❌ ${ep} failed: ${e.message}`);
+      }
+    }
+
+    const msg = ['All endpoint attempts failed.', 'Tried:', ...failures.map(f => `- ${f.endpoint}: ${f.error}`)].join('\n');
+    throw new Error(msg);
   }
 
-  getNextRequestId() {
-    return ++this.requestId;
+  async _postJsonRpc(endpoint, request) {
+    const url = this._url(endpoint);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        // Server requires JSON body + both acceptable response types
+        'Content-Type': 'application/json',
+        'Accept': 'application/json; q=1.0, text/event-stream; q=0.9'
+      },
+      body: JSON.stringify(request)
+    });
+
+    const text = await res.text().catch(() => '');
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText}. Body: ${text.slice(0, 500)}`);
+    }
+
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+
+    // Prefer JSON
+    if (ct.includes('application/json')) {
+      try {
+        return text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(`Non-JSON response. Body: ${text.slice(0, 500)}`);
+      }
+    }
+
+    // If server ever streams SSE for initialize (rare), try to parse first event payload
+    if (ct.includes('text/event-stream')) {
+      // Very simple parse: look for first `data: ...` line that is JSON
+      const match = text.match(/^\s*data:\s*(\{[\s\S]*?\})\s*$/m);
+      if (match) {
+        try { return JSON.parse(match[1]); } catch { /* fall through */ }
+      }
+      // As a fallback, return the raw stream so caller can decide
+      return { stream: text, contentType: ct };
+    }
+
+    // Unknown content-type; return raw body
+    return { raw: text, contentType: ct };
   }
 
-  getAvailableTools() {
-    return this.availableTools;
-  }
+  // ---- Misc helpers ----
 
-  isToolAvailable(toolName) {
-    return this.availableTools.some(tool => tool.name === toolName);
-  }
+  getAvailableTools() { return this.availableTools; }
+  isToolAvailable(name) { return this.availableTools.some(t => t.name === name); }
 
   async reconnect() {
     if (this.connectionConfig) {
@@ -215,81 +224,20 @@ class MCPClientServiceHTTP {
       toolCount: this.availableTools.length,
       serverType: 'MCP HTTP Transport',
       baseUrl: this.baseUrl,
+      basePath: this.basePath,
+      workingEndpoint: this.workingEndpoint,
       serverInfo: this.serverInfo
     };
   }
 
-  // Health check method
   async healthCheck() {
     try {
-      const response = await fetch(`${this.baseUrl}/health`, {
-        method: 'GET'
-      });
-      return response.ok;
-    } catch (error) {
+      const res = await fetch(`${this.baseUrl}/health`, { method: 'GET' });
+      return res.ok;
+    } catch {
       return false;
-    }
-  }
-
-  // Mock mode methods for compatibility
-  enableMockMode() {
-    console.log('📝 Mock mode enabled - will use fallback responses');
-    this.mockMode = true;
-  }
-
-  enableRealMode() {
-    console.log('🔧 Real mode enabled - will use actual MCP server');
-    this.mockMode = false;
-  }
-
-  // Additional MCP-specific methods
-  async getServerCapabilities() {
-    if (!this.serverInfo) {
-      return null;
-    }
-    return this.serverInfo.capabilities;
-  }
-
-  async listResources() {
-    if (!this.isConnected) {
-      throw new Error('MCP client not connected');
-    }
-
-    try {
-      const response = await this.sendMCPRequest({
-        jsonrpc: "2.0",
-        id: this.getNextRequestId(),
-        method: "resources/list",
-        params: {}
-      });
-
-      return response.result;
-    } catch (error) {
-      console.warn('Resources not supported by this MCP server:', error);
-      return { resources: [] };
-    }
-  }
-
-  async getPrompts() {
-    if (!this.isConnected) {
-      throw new Error('MCP client not connected');
-    }
-
-    try {
-      const response = await this.sendMCPRequest({
-        jsonrpc: "2.0",
-        id: this.getNextRequestId(),
-        method: "prompts/list",
-        params: {}
-      });
-
-      return response.result;
-    } catch (error) {
-      console.warn('Prompts not supported by this MCP server:', error);
-      return { prompts: [] };
     }
   }
 }
 
-// Export singleton instance
 export default new MCPClientServiceHTTP();
