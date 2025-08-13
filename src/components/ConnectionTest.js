@@ -46,7 +46,7 @@ export const ConnectionTest = () => {
       addTestResult('Health Check', false, `Health check failed: ${error.message}`);
     }
 
-    // Test 3: Try different MCP endpoints (controller-based routing)
+    // Test 3: Test /api/v1/ endpoints specifically
     const mcpRequest = {
       jsonrpc: "2.0",
       id: 1,
@@ -58,21 +58,19 @@ export const ConnectionTest = () => {
       }
     };
 
-    const endpoints = [
-      '/mcp',           // Standard
-      '/api/mcp',       // Common ASP.NET pattern
-      '/api/Mcp',       // PascalCase
-      '/Mcp',           // Controller name
-      '/jsonrpc',       // Alternative
-      '/api/jsonrpc',   // API + alternative
-      '/rpc',           // Simple RPC
-      '/api/rpc'        // API + RPC
+    const apiV1Endpoints = [
+      '/api/v1/mcp',        // Standard MCP under v1 API
+      '/api/v1/jsonrpc',    // JSON-RPC under v1 API  
+      '/api/v1/rpc',        // RPC under v1 API
+      '/api/v1',            // Base v1 API endpoint
+      '/api/v1/tools',      // Tools endpoint
+      '/api/v1/initialize', // Direct initialize
     ];
 
-    let endpointSuccess = false;
-    for (const endpoint of endpoints) {
+    let apiSuccess = false;
+    for (const endpoint of apiV1Endpoints) {
       try {
-        addTestResult(`Endpoint: ${endpoint}`, null, `Testing ${endpoint}...`);
+        addTestResult(`API v1: ${endpoint}`, null, `Testing ${endpoint}...`);
         
         const response = await fetch(`${serverUrl}${endpoint}`, {
           method: 'POST',
@@ -85,19 +83,19 @@ export const ConnectionTest = () => {
         const responseText = await response.text();
         
         if (response.ok) {
-          addTestResult(`Endpoint: ${endpoint}`, true, `✅ SUCCESS! Endpoint found at ${endpoint}\nResponse: ${responseText}`);
-          endpointSuccess = true;
+          addTestResult(`API v1: ${endpoint}`, true, `✅ SUCCESS! Found working endpoint: ${endpoint}\nResponse: ${responseText}`);
+          apiSuccess = true;
           break;
         } else {
-          addTestResult(`Endpoint: ${endpoint}`, false, `❌ ${response.status} ${response.statusText}: ${responseText}`);
+          addTestResult(`API v1: ${endpoint}`, false, `❌ ${response.status} ${response.statusText}: ${responseText.substring(0, 100)}`);
         }
       } catch (error) {
-        addTestResult(`Endpoint: ${endpoint}`, false, `❌ ${error.message}`);
+        addTestResult(`API v1: ${endpoint}`, false, `❌ ${error.message}`);
       }
     }
 
-    if (!endpointSuccess) {
-      addTestResult('Endpoint Discovery', false, '❌ No MCP endpoint found. Check your controller route configuration.');
+    if (!apiSuccess) {
+      addTestResult('API v1 Summary', false, '❌ No working /api/v1/ MCP endpoint found. Check your controller routing.');
     }
 
     // Test 4: Alternative HTTP methods

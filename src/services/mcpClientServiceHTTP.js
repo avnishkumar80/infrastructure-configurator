@@ -131,52 +131,55 @@ class MCPClientServiceHTTP {
   }
 
   async sendMCPRequest(request) {
-    // Based on your server showing "application/jso" (truncated), let's try exact variations
-    const variations = [
-      // Try without charset first (most common for C# servers)
-      { 'Content-Type': 'application/json' },
-      // Try text/json (common for older ASP.NET)
-      { 'Content-Type': 'text/json' },
-      // Try with explicit charset
-      { 'Content-Type': 'application/json; charset=utf-8' },
-      // Try JSON-RPC specific
-      { 'Content-Type': 'application/jsonrequest' },
-      // Try minimal content type
-      { 'Content-Type': 'application/json-rpc' },
-      // Try exactly what curl showed (if it was truncated)
-      { 'Content-Type': 'application/json; charset=UTF-8' },
+    // Try different endpoint paths for your API structure
+    const endpointPaths = [
+      '/api/v1/mcp',        // Your API v1 + standard MCP
+      '/api/v1/jsonrpc',    // Your API v1 + JSON-RPC
+      '/api/v1/rpc',        // Your API v1 + RPC
+      '/api/v1',            // Your API v1 base
+      '/mcp',               // Fallback to standard
     ];
 
-    for (let i = 0; i < variations.length; i++) {
-      try {
-        console.log(`🔄 Attempt ${i + 1}: Testing Content-Type:`, variations[i]['Content-Type']);
-        
-        const response = await fetch(`${this.baseUrl}/mcp`, {
-          method: 'POST',
-          headers: variations[i],
-          body: JSON.stringify(request)
-        });
+    const contentTypes = [
+      'application/json',
+      'text/json',
+      'application/json; charset=utf-8'
+    ];
 
-        console.log(`📝 Response status: ${response.status} ${response.statusText}`);
-        console.log(`📝 Response headers:`, Object.fromEntries(response.headers.entries()));
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log('✅ SUCCESS! Working Content-Type:', variations[i]['Content-Type']);
-          console.log('📦 Response data:', data);
+    for (const endpoint of endpointPaths) {
+      for (const contentType of contentTypes) {
+        try {
+          console.log(`🔄 Testing: ${this.baseUrl}${endpoint} with Content-Type: ${contentType}`);
           
-          return data;
-        } else {
-          const errorText = await response.text();
-          console.warn(`❌ Content-Type "${variations[i]['Content-Type']}" failed: ${response.status} - ${errorText}`);
+          const response = await fetch(`${this.baseUrl}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': contentType },
+            body: JSON.stringify(request)
+          });
+
+          console.log(`📝 Response: ${response.status} ${response.statusText}`);
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log('✅ SUCCESS! Working endpoint:', endpoint, 'Content-Type:', contentType);
+            console.log('📦 Response:', data);
+            
+            // Update the working endpoint for future requests
+            this.workingEndpoint = endpoint;
+            this.workingContentType = contentType;
+            
+            return data;
+          } else {
+            const errorText = await response.text();
+            console.warn(`❌ ${endpoint} failed: ${response.status} - ${errorText}`);
+          }
+        } catch (error) {
+          console.warn(`❌ ${endpoint} error:`, error.message);
         }
-      } catch (error) {
-        console.warn(`❌ Content-Type "${variations[i]['Content-Type']}" error:`, error.message);
       }
     }
 
-    // If all failed, throw the last error
-    throw new Error('All Content-Type variations failed. Server may require specific content-type configuration.');
+    throw new Error('All endpoint and content-type combinations failed for /api/v1/ structure');
   }
 
   getNextRequestId() {
