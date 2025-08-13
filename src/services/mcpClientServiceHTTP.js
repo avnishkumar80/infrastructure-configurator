@@ -87,9 +87,27 @@ class MCPClientServiceHTTP {
       }
 
       const tools = resp?.result?.tools;
+      
+      // Debug logging
+      console.log('🔍 Full tools/list response:', resp);
+      console.log('🔍 Extracted tools:', tools);
+      
       if (Array.isArray(tools)) {
         this.availableTools = tools;
         console.log('🔄 Refreshed available MCP tools:', this.availableTools.map(t => t.name));
+        
+        // Debug each tool structure in detail
+        console.log('🔍 DETAILED TOOL ANALYSIS:');
+        tools.forEach((tool, index) => {
+          console.log(`🛠️ Tool ${index + 1}:`, {
+            name: tool.name,
+            description: tool.description,
+            hasDescription: !!tool.description,
+            allKeys: Object.keys(tool),
+            fullObject: tool
+          });
+        });
+        
         return this.availableTools;
       }
 
