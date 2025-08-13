@@ -1,3 +1,5 @@
+import { getMCPServerUrl } from '../config/serverConfig.js';
+
 /**
  * MCP Client Service with HTTP Transport
  * Native MCP protocol (JSON-RPC 2.0) over HTTP instead of WebSocket
@@ -6,7 +8,8 @@ class MCPClientServiceHTTP {
   constructor() {
     this.isConnected = false;
     this.availableTools = [];
-    this.baseUrl = 'http://localhost:5000';
+    // Get server URL from configuration
+    this.baseUrl = getMCPServerUrl();
     this.requestId = 0;
     this.serverInfo = null;
     this.clientCapabilities = {
@@ -128,36 +131,67 @@ class MCPClientServiceHTTP {
   }
 
   async sendMCPRequest(request) {
-    try {
-      // Standard MCP HTTP transport endpoint
-      const response = await fetch(`${this.baseUrl}/mcp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(request)
-      });
+    // Try different header combinations for C# MCP servers
+    const headerVariations = [
+      // Standard approach
+      {
+        'Content-Type': 'application/json',
+      },
+      // With explicit Accept header
+      {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      // Alternative content types that some servers expect
+      {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': '*/*',
+      },
+      // Minimal headers
+      {}
+    ];
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    for (let i = 0; i < headerVariations.length; i++) {
+      try {
+        console.log(`Attempting MCP request with headers variation ${i + 1}:`, headerVariations[i]);
+        
+        const response = await fetch(`${this.baseUrl}/mcp`, {
+          method: 'POST',
+          headers: headerVariations[i],
+          body: JSON.stringify(request)
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Validate JSON-RPC 2.0 response
+          if (data.jsonrpc !== "2.0") {
+            throw new Error('Invalid JSON-RPC 2.0 response');
+          }
+
+          if (data.error) {
+            throw new Error(`MCP Error ${data.error.code}: ${data.error.message}`);
+          }
+
+          console.log('✅ MCP request successful with headers:', headerVariations[i]);
+          return data;
+        } else {
+          console.warn(`Headers variation ${i + 1} failed with status ${response.status}: ${response.statusText}`);
+          
+          // If this is the last variation, throw the error
+          if (i === headerVariations.length - 1) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+        }
+      } catch (error) {
+        console.warn(`Headers variation ${i + 1} failed:`, error.message);
+        
+        // If this is the last variation, throw the error
+        if (i === headerVariations.length - 1) {
+          console.error('All header variations failed. MCP HTTP request failed:', error);
+          throw error;
+        }
       }
-
-      const data = await response.json();
-      
-      // Validate JSON-RPC 2.0 response
-      if (data.jsonrpc !== "2.0") {
-        throw new Error('Invalid JSON-RPC 2.0 response');
-      }
-
-      if (data.error) {
-        throw new Error(`MCP Error ${data.error.code}: ${data.error.message}`);
-      }
-
-      return data;
-    } catch (error) {
-      console.error('MCP HTTP request failed:', error);
-      throw error;
     }
   }
 

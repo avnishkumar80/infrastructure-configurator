@@ -19,8 +19,9 @@ export const useMCPIntegration = () => {
       
       try {
         // MCP HTTP transport server configuration
+        // Update the baseUrl to point to your C# server machine
         const serverConfig = {
-          baseUrl: 'http://localhost:5000',
+          baseUrl: 'http://localhost:5000', // Change to http://YOUR_SERVER_IP:5000
           transport: 'http'
         };
         
