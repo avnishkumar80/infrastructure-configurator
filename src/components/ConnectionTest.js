@@ -46,7 +46,7 @@ export const ConnectionTest = () => {
       addTestResult('Health Check', false, `Health check failed: ${error.message}`);
     }
 
-    // Test 3: MCP endpoint with different content types
+    // Test 3: Try different MCP endpoints (controller-based routing)
     const mcpRequest = {
       jsonrpc: "2.0",
       id: 1,
@@ -58,43 +58,46 @@ export const ConnectionTest = () => {
       }
     };
 
-    const contentTypes = [
-      'application/json',
-      'application/json; charset=utf-8',
-      'application/json-rpc',
-      'text/json',
-      'text/plain'
+    const endpoints = [
+      '/mcp',           // Standard
+      '/api/mcp',       // Common ASP.NET pattern
+      '/api/Mcp',       // PascalCase
+      '/Mcp',           // Controller name
+      '/jsonrpc',       // Alternative
+      '/api/jsonrpc',   // API + alternative
+      '/rpc',           // Simple RPC
+      '/api/rpc'        // API + RPC
     ];
 
-    let mcpSuccess = false;
-    for (const contentType of contentTypes) {
+    let endpointSuccess = false;
+    for (const endpoint of endpoints) {
       try {
-        addTestResult(`MCP Content-Type: ${contentType}`, null, `Testing with ${contentType}...`);
+        addTestResult(`Endpoint: ${endpoint}`, null, `Testing ${endpoint}...`);
         
-        const response = await fetch(`${serverUrl}/mcp`, {
+        const response = await fetch(`${serverUrl}${endpoint}`, {
           method: 'POST',
           headers: {
-            'Content-Type': contentType,
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify(mcpRequest)
         });
 
+        const responseText = await response.text();
+        
         if (response.ok) {
-          const data = await response.json();
-          addTestResult(`MCP Content-Type: ${contentType}`, true, `✅ SUCCESS! Server accepts ${contentType}\n${JSON.stringify(data, null, 2)}`);
-          mcpSuccess = true;
+          addTestResult(`Endpoint: ${endpoint}`, true, `✅ SUCCESS! Endpoint found at ${endpoint}\nResponse: ${responseText}`);
+          endpointSuccess = true;
           break;
         } else {
-          const errorText = await response.text();
-          addTestResult(`MCP Content-Type: ${contentType}`, false, `❌ ${response.status} ${response.statusText}: ${errorText}`);
+          addTestResult(`Endpoint: ${endpoint}`, false, `❌ ${response.status} ${response.statusText}: ${responseText}`);
         }
       } catch (error) {
-        addTestResult(`MCP Content-Type: ${contentType}`, false, `❌ ${error.message}`);
+        addTestResult(`Endpoint: ${endpoint}`, false, `❌ ${error.message}`);
       }
     }
 
-    if (!mcpSuccess) {
-      addTestResult('MCP Endpoint Summary', false, '❌ No content-type worked. Server may not support MCP over HTTP or endpoint is wrong.');
+    if (!endpointSuccess) {
+      addTestResult('Endpoint Discovery', false, '❌ No MCP endpoint found. Check your controller route configuration.');
     }
 
     // Test 4: Alternative HTTP methods

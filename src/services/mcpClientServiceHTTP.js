@@ -131,66 +131,52 @@ class MCPClientServiceHTTP {
   }
 
   async sendMCPRequest(request) {
-    // Try different content-type combinations for C# MCP servers
-    const contentTypeVariations = [
-      // Standard JSON
+    // Based on your server showing "application/jso" (truncated), let's try exact variations
+    const variations = [
+      // Try without charset first (most common for C# servers)
       { 'Content-Type': 'application/json' },
-      // JSON with charset
-      { 'Content-Type': 'application/json; charset=utf-8' },
-      // JSON-RPC specific
-      { 'Content-Type': 'application/json-rpc' },
-      // Alternative JSON types
+      // Try text/json (common for older ASP.NET)
       { 'Content-Type': 'text/json' },
-      // Plain text (some servers expect this)
-      { 'Content-Type': 'text/plain' },
-      // Application specific
-      { 'Content-Type': 'application/x-json' },
-      // No content type (let browser decide)
-      {}
+      // Try with explicit charset
+      { 'Content-Type': 'application/json; charset=utf-8' },
+      // Try JSON-RPC specific
+      { 'Content-Type': 'application/jsonrequest' },
+      // Try minimal content type
+      { 'Content-Type': 'application/json-rpc' },
+      // Try exactly what curl showed (if it was truncated)
+      { 'Content-Type': 'application/json; charset=UTF-8' },
     ];
 
-    for (let i = 0; i < contentTypeVariations.length; i++) {
+    for (let i = 0; i < variations.length; i++) {
       try {
-        console.log(`🔄 Attempting MCP request with Content-Type variation ${i + 1}:`, contentTypeVariations[i]);
+        console.log(`🔄 Attempt ${i + 1}: Testing Content-Type:`, variations[i]['Content-Type']);
         
         const response = await fetch(`${this.baseUrl}/mcp`, {
           method: 'POST',
-          headers: contentTypeVariations[i],
+          headers: variations[i],
           body: JSON.stringify(request)
         });
 
+        console.log(`📝 Response status: ${response.status} ${response.statusText}`);
+        console.log(`📝 Response headers:`, Object.fromEntries(response.headers.entries()));
+
         if (response.ok) {
           const data = await response.json();
+          console.log('✅ SUCCESS! Working Content-Type:', variations[i]['Content-Type']);
+          console.log('📦 Response data:', data);
           
-          // Validate JSON-RPC 2.0 response
-          if (data.jsonrpc !== "2.0") {
-            console.warn('Non-standard JSON-RPC response, but server accepted request');
-          }
-
-          if (data.error) {
-            throw new Error(`MCP Error ${data.error.code}: ${data.error.message}`);
-          }
-
-          console.log('✅ MCP request successful with Content-Type:', contentTypeVariations[i]);
           return data;
         } else {
-          console.warn(`📝 Content-Type variation ${i + 1} failed with status ${response.status}: ${response.statusText}`);
-          
-          // If this is the last variation, throw the error
-          if (i === contentTypeVariations.length - 1) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText} - All Content-Type variations failed`);
-          }
+          const errorText = await response.text();
+          console.warn(`❌ Content-Type "${variations[i]['Content-Type']}" failed: ${response.status} - ${errorText}`);
         }
       } catch (error) {
-        console.warn(`⚠️ Content-Type variation ${i + 1} failed:`, error.message);
-        
-        // If this is the last variation, throw the error
-        if (i === contentTypeVariations.length - 1) {
-          console.error('❌ All Content-Type variations failed. MCP HTTP request failed:', error);
-          throw error;
-        }
+        console.warn(`❌ Content-Type "${variations[i]['Content-Type']}" error:`, error.message);
       }
     }
+
+    // If all failed, throw the last error
+    throw new Error('All Content-Type variations failed. Server may require specific content-type configuration.');
   }
 
   getNextRequestId() {
