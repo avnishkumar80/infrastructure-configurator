@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import mcpClientService from '../services/mcpClientService.js';
+import httpMcpClientService from '../services/httpMcpClientService.js';
 
 /**
  * MCP Integration Hook (Browser Compatible)
@@ -25,18 +25,18 @@ export const useMCPIntegration = () => {
           env: {} // This won't be used in browser mode
         };
         
-        console.log('🔌 Attempting MCP connection (browser mode)...');
+        console.log('🔌 Attempting HTTP MCP connection to localhost:5000...');
 
-        const connected = await mcpClientService.connect(serverConfig);
+        const connected = await httpMcpClientService.connect();
         setIsConnected(connected);
         
         if (connected) {
-          const tools = mcpClientService.getAvailableTools();
+          const tools = httpMcpClientService.getAvailableTools();
           setAvailableTools(tools);
-          console.log('✅ MCP Integration successful (mock mode active)');
+          console.log('✅ HTTP MCP Integration successful');
         } else {
-          setConnectionError('Failed to connect to MCP server');
-          console.log('❌ MCP Integration failed');
+          setConnectionError('Failed to connect to C# MCP server on localhost:5000');
+          console.log('❌ HTTP MCP Integration failed');
           setAvailableTools([]);
         }
       } catch (error) {
@@ -53,7 +53,7 @@ export const useMCPIntegration = () => {
 
     // Cleanup on unmount
     return () => {
-      mcpClientService.disconnect();
+      httpMcpClientService.disconnect();
     };
   }, []);
 
@@ -69,7 +69,7 @@ export const useMCPIntegration = () => {
     }
 
     try {
-      const result = await mcpClientService.callTool(toolName, parameters);
+      const result = await httpMcpClientService.callTool(toolName, parameters);
       return result;
     } catch (error) {
       console.error(`Error calling tool ${toolName}:`, error);
@@ -86,7 +86,7 @@ export const useMCPIntegration = () => {
     if (!isConnected) return [];
     
     try {
-      const tools = await mcpClientService.refreshAvailableTools();
+      const tools = await httpMcpClientService.refreshAvailableTools();
       setAvailableTools(tools);
       return tools;
     } catch (error) {
@@ -100,11 +100,11 @@ export const useMCPIntegration = () => {
     setConnectionError(null);
     
     try {
-      const connected = await mcpClientService.reconnect();
+      const connected = await httpMcpClientService.reconnect();
       setIsConnected(connected);
       
       if (connected) {
-        const tools = mcpClientService.getAvailableTools();
+        const tools = httpMcpClientService.getAvailableTools();
         setAvailableTools(tools);
       }
       
@@ -123,19 +123,11 @@ export const useMCPIntegration = () => {
       isConnecting,
       toolCount: availableTools.length,
       error: connectionError,
-      ...mcpClientService.getConnectionStatus()
+      ...httpMcpClientService.getConnectionStatus()
     };
   }, [isConnected, isConnecting, availableTools.length, connectionError]);
 
-  // Methods to control mock/real mode
-  const enableMockMode = useCallback(() => {
-    mcpClientService.enableMockMode();
-  }, []);
-
-  const enableRealMode = useCallback(() => {
-    mcpClientService.enableRealMode();
-  }, []);
-
+  // Remove the mock mode methods since HTTP client doesn't need them
   return {
     // Connection state
     isConnected,
@@ -150,10 +142,6 @@ export const useMCPIntegration = () => {
     refreshTools,
     reconnect,
     getConnectionStatus,
-    
-    // Mode control
-    enableMockMode,
-    enableRealMode,
     
     // Utility functions
     isToolAvailable: useCallback((toolName) => {

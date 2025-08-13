@@ -4,28 +4,29 @@
  */
 
 export const mcpConfig = {
-  // Development configuration
+  // Development configuration for C# HTTP server
   development: {
-    command: 'node',
-    // TODO: Update this path to point to your team's MCP server
-    args: ['../your-mcp-server/dist/index.js'], 
-    env: {
-      ...process.env,
-      NODE_ENV: 'development',
-      MCP_LOG_LEVEL: 'debug'
+    serverType: 'http',
+    baseUrl: 'http://localhost:5000',
+    endpoints: {
+      health: '/api/health',
+      initialize: '/api/mcp/initialize',
+      listTools: '/api/mcp/tools/list',
+      callTool: '/api/mcp/tools/call'
     },
     autoReconnect: true,
     reconnectDelay: 5000
   },
   
-  // Production configuration
+  // Production configuration for C# HTTP server
   production: {
-    command: 'node',
-    args: ['./mcp-server/index.js'],
-    env: {
-      ...process.env,
-      NODE_ENV: 'production',
-      MCP_LOG_LEVEL: 'info'
+    serverType: 'http',
+    baseUrl: 'http://your-production-server:5000',
+    endpoints: {
+      health: '/api/health',
+      initialize: '/api/mcp/initialize',
+      listTools: '/api/mcp/tools/list',
+      callTool: '/api/mcp/tools/call'
     },
     autoReconnect: true,
     reconnectDelay: 10000
