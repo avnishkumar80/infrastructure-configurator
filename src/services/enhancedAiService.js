@@ -1,5 +1,5 @@
 import { mockAIResponses } from '../utils/mockData.js';
-import mcpClientService from './mcpClientService.js';
+import mcpClientService from './mcpClientServiceHTTP.js';
 
 /**
  * Enhanced AI Service with MCP Integration (Browser Compatible)
@@ -30,22 +30,93 @@ export class EnhancedAiService {
 
   async processWithMCP(userMessage, currentContext) {
     try {
-      // Use MCP to analyze the message
-      const analysisResult = await mcpClientService.callTool('analyze_chat_message', {
-        message: userMessage,
-        context: currentContext
-      });
-
-      if (analysisResult.success && analysisResult.result) {
-        return this.generateMCPResponse(analysisResult.result, userMessage);
-      } else {
-        console.warn('MCP analysis failed, falling back to standard processing');
-        return this.processFallback(userMessage, currentContext);
+      console.log('🤖 Processing with MCP - Available tools:', mcpClientService.getAvailableTools().map(t => t.name));
+      
+      // First, check if user is asking for tool list
+      if (userMessage.toLowerCase().includes('list') && (userMessage.toLowerCase().includes('tool') || userMessage.toLowerCase().includes('command'))) {
+        return this.generateToolListResponse();
       }
+      
+      // Try to use analyze_chat_message if available
+      if (mcpClientService.isToolAvailable('analyze_chat_message')) {
+        const analysisResult = await mcpClientService.callTool('analyze_chat_message', {
+          message: userMessage,
+          context: currentContext
+        });
+
+        if (analysisResult.success && analysisResult.result) {
+          return this.generateMCPResponse(analysisResult.result, userMessage);
+        } else {
+          console.warn('MCP analysis failed:', analysisResult.error);
+        }
+      }
+      
+      // If no specific tool or analysis failed, provide tool-aware response
+      return this.generateToolAwareResponse(userMessage, currentContext);
+      
     } catch (error) {
       console.error('Error processing with MCP:', error);
       return this.processFallback(userMessage, currentContext);
     }
+  }
+
+  generateToolListResponse() {
+    const tools = mcpClientService.getAvailableTools();
+    
+    let response = `🛠️ **Available MCP Tools** (${tools.length} tools connected)\n\n`;
+    
+    tools.forEach((tool, index) => {
+      response += `**${index + 1}. ${tool.name}**\n`;
+      if (tool.description) {
+        response += `   ${tool.description}\n`;
+      } else {
+        response += `   *No description available*\n`;
+      }
+      response += `\n`;
+    });
+    
+    response += `💡 **Try asking me to use one of these tools!**\n`;
+    response += `For example: "Use the validate tool" or "Help me with configuration analysis"`;
+    
+    return {
+      response: {
+        type: 'tool_list',
+        content: response
+      },
+      analysis: {
+        toolListRequest: true,
+        availableTools: tools.length
+      },
+      suggestedActions: tools.slice(0, 3).map(tool => ({
+        type: 'tool_execution',
+        label: `Use ${tool.name}`,
+        toolName: tool.name,
+        description: tool.description || 'Execute this tool'
+      }))
+    };
+  }
+
+  generateToolAwareResponse(userMessage, currentContext) {
+    const tools = mcpClientService.getAvailableTools();
+    
+    return {
+      response: {
+        type: 'mcp_available',
+        content: `🤖 **I'm connected to your MCP server!**\n\nI have access to ${tools.length} tools and can help you with real tasks.\n\n**Available capabilities:**\n${tools.map(t => `• ${t.name}`).join('\n')}\n\nWhat would you like me to help you with? I can use these tools to provide actual assistance instead of just giving generic advice.`
+      },
+      analysis: {
+        mcpConnected: true,
+        availableTools: tools.length,
+        userMessage: userMessage
+      },
+      suggestedActions: [
+        {
+          type: 'tool_list_request',
+          label: 'Show all tools',
+          description: 'List all available MCP tools'
+        }
+      ]
+    };
   }
 
   generateMCPResponse(analysis, originalMessage) {

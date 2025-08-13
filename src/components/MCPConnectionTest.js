@@ -89,7 +89,12 @@ export const MCPConnectionTest = () => {
             {availableTools.map((tool, index) => (
               <div key={index} className="bg-gray-50 p-3 rounded">
                 <div className="font-medium">{tool.name}</div>
-                <div className="text-sm text-gray-600">{tool.description}</div>
+                <div className="text-sm text-gray-600">
+                  {tool.description || <span className="text-red-500 italic">No description</span>}
+                </div>
+                <div className="text-xs text-blue-600 mt-1">
+                  Debug: desc="{tool.description}" | hasDesc: {tool.description ? 'yes' : 'no'} | type: {typeof tool.description}
+                </div>
               </div>
             ))}
           </div>
