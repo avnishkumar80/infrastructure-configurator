@@ -18,13 +18,6 @@ export const useMCPIntegration = () => {
       setConnectionError(null);
       
       try {
-        // Browser-compatible MCP server configuration
-        const serverConfig = {
-          command: 'node', // This won't be used in browser mode
-          args: ['mcp-server'], // This won't be used in browser mode
-          env: {} // This won't be used in browser mode
-        };
-        
         // MCP HTTP transport server configuration
         const serverConfig = {
           baseUrl: 'http://localhost:5000',
