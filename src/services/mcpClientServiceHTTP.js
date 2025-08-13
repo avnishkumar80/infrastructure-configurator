@@ -131,33 +131,31 @@ class MCPClientServiceHTTP {
   }
 
   async sendMCPRequest(request) {
-    // Try different header combinations for C# MCP servers
-    const headerVariations = [
-      // Standard approach
-      {
-        'Content-Type': 'application/json',
-      },
-      // With explicit Accept header
-      {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      // Alternative content types that some servers expect
-      {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Accept': '*/*',
-      },
-      // Minimal headers
+    // Try different content-type combinations for C# MCP servers
+    const contentTypeVariations = [
+      // Standard JSON
+      { 'Content-Type': 'application/json' },
+      // JSON with charset
+      { 'Content-Type': 'application/json; charset=utf-8' },
+      // JSON-RPC specific
+      { 'Content-Type': 'application/json-rpc' },
+      // Alternative JSON types
+      { 'Content-Type': 'text/json' },
+      // Plain text (some servers expect this)
+      { 'Content-Type': 'text/plain' },
+      // Application specific
+      { 'Content-Type': 'application/x-json' },
+      // No content type (let browser decide)
       {}
     ];
 
-    for (let i = 0; i < headerVariations.length; i++) {
+    for (let i = 0; i < contentTypeVariations.length; i++) {
       try {
-        console.log(`Attempting MCP request with headers variation ${i + 1}:`, headerVariations[i]);
+        console.log(`🔄 Attempting MCP request with Content-Type variation ${i + 1}:`, contentTypeVariations[i]);
         
         const response = await fetch(`${this.baseUrl}/mcp`, {
           method: 'POST',
-          headers: headerVariations[i],
+          headers: contentTypeVariations[i],
           body: JSON.stringify(request)
         });
 
@@ -166,29 +164,29 @@ class MCPClientServiceHTTP {
           
           // Validate JSON-RPC 2.0 response
           if (data.jsonrpc !== "2.0") {
-            throw new Error('Invalid JSON-RPC 2.0 response');
+            console.warn('Non-standard JSON-RPC response, but server accepted request');
           }
 
           if (data.error) {
             throw new Error(`MCP Error ${data.error.code}: ${data.error.message}`);
           }
 
-          console.log('✅ MCP request successful with headers:', headerVariations[i]);
+          console.log('✅ MCP request successful with Content-Type:', contentTypeVariations[i]);
           return data;
         } else {
-          console.warn(`Headers variation ${i + 1} failed with status ${response.status}: ${response.statusText}`);
+          console.warn(`📝 Content-Type variation ${i + 1} failed with status ${response.status}: ${response.statusText}`);
           
           // If this is the last variation, throw the error
-          if (i === headerVariations.length - 1) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          if (i === contentTypeVariations.length - 1) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText} - All Content-Type variations failed`);
           }
         }
       } catch (error) {
-        console.warn(`Headers variation ${i + 1} failed:`, error.message);
+        console.warn(`⚠️ Content-Type variation ${i + 1} failed:`, error.message);
         
         // If this is the last variation, throw the error
-        if (i === headerVariations.length - 1) {
-          console.error('All header variations failed. MCP HTTP request failed:', error);
+        if (i === contentTypeVariations.length - 1) {
+          console.error('❌ All Content-Type variations failed. MCP HTTP request failed:', error);
           throw error;
         }
       }

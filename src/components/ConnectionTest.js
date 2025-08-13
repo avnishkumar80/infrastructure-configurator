@@ -46,45 +46,88 @@ export const ConnectionTest = () => {
       addTestResult('Health Check', false, `Health check failed: ${error.message}`);
     }
 
-    // Test 3: MCP endpoint variations
-    const mcpEndpoints = ['/mcp', '/api/mcp', '/mcp/v1', '/jsonrpc'];
-    
-    for (const endpoint of mcpEndpoints) {
-      try {
-        addTestResult(`MCP Endpoint ${endpoint}`, null, `Testing ${endpoint} endpoint...`);
-        const mcpRequest = {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "initialize",
-          params: {
-            protocolVersion: "2024-11-05",
-            capabilities: { tools: {} },
-            clientInfo: { name: "connection-test", version: "1.0.0" }
-          }
-        };
+    // Test 3: MCP endpoint with different content types
+    const mcpRequest = {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: { tools: {} },
+        clientInfo: { name: "connection-test", version: "1.0.0" }
+      }
+    };
 
-        const response = await fetch(`${serverUrl}${endpoint}`, {
+    const contentTypes = [
+      'application/json',
+      'application/json; charset=utf-8',
+      'application/json-rpc',
+      'text/json',
+      'text/plain'
+    ];
+
+    let mcpSuccess = false;
+    for (const contentType of contentTypes) {
+      try {
+        addTestResult(`MCP Content-Type: ${contentType}`, null, `Testing with ${contentType}...`);
+        
+        const response = await fetch(`${serverUrl}/mcp`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': contentType,
           },
           body: JSON.stringify(mcpRequest)
         });
 
         if (response.ok) {
           const data = await response.json();
-          addTestResult(`MCP Endpoint ${endpoint}`, true, `MCP initialization successful: ${JSON.stringify(data, null, 2)}`);
-          break; // Stop testing other endpoints if one works
+          addTestResult(`MCP Content-Type: ${contentType}`, true, `✅ SUCCESS! Server accepts ${contentType}\n${JSON.stringify(data, null, 2)}`);
+          mcpSuccess = true;
+          break;
         } else {
           const errorText = await response.text();
-          addTestResult(`MCP Endpoint ${endpoint}`, false, `Error ${response.status}: ${errorText}`);
+          addTestResult(`MCP Content-Type: ${contentType}`, false, `❌ ${response.status} ${response.statusText}: ${errorText}`);
         }
       } catch (error) {
-        addTestResult(`MCP Endpoint ${endpoint}`, false, `Failed: ${error.message}`);
+        addTestResult(`MCP Content-Type: ${contentType}`, false, `❌ ${error.message}`);
       }
     }
 
-    // Test 4: CORS check
+    if (!mcpSuccess) {
+      addTestResult('MCP Endpoint Summary', false, '❌ No content-type worked. Server may not support MCP over HTTP or endpoint is wrong.');
+    }
+
+    // Test 4: Alternative HTTP methods
+    try {
+      addTestResult('HTTP Methods', null, 'Testing different HTTP methods...');
+      
+      // Test GET request (some servers might use query params)
+      const getUrl = `${serverUrl}/mcp?method=initialize&jsonrpc=2.0&id=1`;
+      const getResponse = await fetch(getUrl, { method: 'GET' });
+      
+      if (getResponse.ok) {
+        const data = await getResponse.json();
+        addTestResult('HTTP Methods', true, `✅ GET method works: ${JSON.stringify(data, null, 2)}`);
+      } else {
+        addTestResult('HTTP Methods', false, `GET method failed: ${getResponse.status} ${getResponse.statusText}`);
+        
+        // Test PUT method
+        const putResponse = await fetch(`${serverUrl}/mcp`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(mcpRequest)
+        });
+        
+        if (putResponse.ok) {
+          const data = await putResponse.json();
+          addTestResult('HTTP Methods', true, `✅ PUT method works: ${JSON.stringify(data, null, 2)}`);
+        } else {
+          addTestResult('HTTP Methods', false, `PUT method also failed: ${putResponse.status}`);
+        }
+      }
+    } catch (error) {
+      addTestResult('HTTP Methods', false, `HTTP methods test failed: ${error.message}`);
+    }
     try {
       addTestResult('CORS Check', null, 'Testing CORS headers...');
       const response = await fetch(`${serverUrl}/mcp`, {
@@ -111,7 +154,32 @@ export const ConnectionTest = () => {
       addTestResult('CORS Check', false, `CORS check failed: ${error.message}`);
     }
 
-    setIsTestingConnection(false);
+    // Test 5: CORS check
+    try {
+      addTestResult('CORS Check', null, 'Testing CORS headers...');
+      const response = await fetch(`${serverUrl}/mcp`, {
+        method: 'OPTIONS',
+        headers: {
+          'Origin': 'http://localhost:3000',
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'Content-Type'
+        }
+      });
+
+      const corsHeaders = {
+        'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+        'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+        'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers')
+      };
+
+      if (corsHeaders['Access-Control-Allow-Origin']) {
+        addTestResult('CORS Check', true, `CORS configured: ${JSON.stringify(corsHeaders, null, 2)}`);
+      } else {
+        addTestResult('CORS Check', false, 'CORS headers not found - you may need to configure CORS');
+      }
+    } catch (error) {
+      addTestResult('CORS Check', false, `CORS check failed: ${error.message}`);
+    }
   };
 
   return (
