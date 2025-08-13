@@ -9,10 +9,11 @@ export const mcpConfig = {
     serverType: 'http',
     baseUrl: 'http://localhost:5000',
     endpoints: {
-      health: '/api/health',
+      health: '/'
+     /* '/api/health',
       initialize: '/api/mcp/initialize',
       listTools: '/api/mcp/tools/list',
-      callTool: '/api/mcp/tools/call'
+      callTool: '/api/mcp/tools/call'*/
     },
     autoReconnect: true,
     reconnectDelay: 5000

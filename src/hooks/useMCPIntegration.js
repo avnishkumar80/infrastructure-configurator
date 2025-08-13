@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import httpMcpClientService from '../services/httpMcpClientService.js';
+import existingApiMCPAdapter from '../services/existingApiMCPAdapter.js';
 
 /**
- * MCP Integration Hook (Browser Compatible)
- * Manages connection to MCP server and provides tool execution capabilities
+ * MCP Integration Hook (Existing API Adapter)
+ * Manages connection to existing C# API and adapts it for MCP-like usage
  */
 export const useMCPIntegration = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -25,18 +25,18 @@ export const useMCPIntegration = () => {
           env: {} // This won't be used in browser mode
         };
         
-        console.log('🔌 Attempting HTTP MCP connection to localhost:5000...');
+        console.log('🔌 Attempting to connect to existing C# API at localhost:5000...');
 
-        const connected = await httpMcpClientService.connect();
+        const connected = await existingApiMCPAdapter.connect();
         setIsConnected(connected);
         
         if (connected) {
-          const tools = httpMcpClientService.getAvailableTools();
+          const tools = existingApiMCPAdapter.getAvailableTools();
           setAvailableTools(tools);
-          console.log('✅ HTTP MCP Integration successful');
+          console.log('✅ Existing API integration successful');
         } else {
-          setConnectionError('Failed to connect to C# MCP server on localhost:5000');
-          console.log('❌ HTTP MCP Integration failed');
+          setConnectionError('Failed to connect to existing C# API on localhost:5000');
+          console.log('❌ Existing API integration failed');
           setAvailableTools([]);
         }
       } catch (error) {
@@ -53,7 +53,7 @@ export const useMCPIntegration = () => {
 
     // Cleanup on unmount
     return () => {
-      httpMcpClientService.disconnect();
+      existingApiMCPAdapter.disconnect();
     };
   }, []);
 
@@ -69,7 +69,7 @@ export const useMCPIntegration = () => {
     }
 
     try {
-      const result = await httpMcpClientService.callTool(toolName, parameters);
+      const result = await existingApiMCPAdapter.callTool(toolName, parameters);
       return result;
     } catch (error) {
       console.error(`Error calling tool ${toolName}:`, error);
@@ -86,7 +86,7 @@ export const useMCPIntegration = () => {
     if (!isConnected) return [];
     
     try {
-      const tools = await httpMcpClientService.refreshAvailableTools();
+      const tools = await existingApiMCPAdapter.refreshAvailableTools();
       setAvailableTools(tools);
       return tools;
     } catch (error) {
@@ -100,11 +100,11 @@ export const useMCPIntegration = () => {
     setConnectionError(null);
     
     try {
-      const connected = await httpMcpClientService.reconnect();
+      const connected = await existingApiMCPAdapter.reconnect();
       setIsConnected(connected);
       
       if (connected) {
-        const tools = httpMcpClientService.getAvailableTools();
+        const tools = existingApiMCPAdapter.getAvailableTools();
         setAvailableTools(tools);
       }
       
@@ -123,7 +123,7 @@ export const useMCPIntegration = () => {
       isConnecting,
       toolCount: availableTools.length,
       error: connectionError,
-      ...httpMcpClientService.getConnectionStatus()
+      ...existingApiMCPAdapter.getConnectionStatus()
     };
   }, [isConnected, isConnecting, availableTools.length, connectionError]);
 
