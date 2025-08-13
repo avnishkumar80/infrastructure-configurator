@@ -1,221 +1,200 @@
-# 🚀 MCP Integration Setup Guide - C# HTTP Server
+# 🚀 MCP Integration Setup Guide - Native Implementation
 
-## ✅ What's Been Updated
+## ✅ What's Currently Implemented
 
-Your infrastructure configurator now has **HTTP-based MCP (Model Context Protocol) integration** for connecting to your C# server! Here's what's been implemented:
+Your infrastructure configurator has **native MCP (Model Context Protocol) integration** restored! Here's the current setup:
 
-### 🔧 Enhanced MCP Components
-- ✅ HTTP MCP Client Service (`services/httpMcpClientService.js`)
-- ✅ Updated MCP Integration Hook (`hooks/useMCPIntegration.js`)
-- ✅ Updated MCP Configuration (`config/mcpConfig.js`)
-- ✅ Enhanced AI Service integration
-- ✅ MCP Test Panel for development testing
-- ✅ Connection Test Component
+### 🔧 Core MCP Components
+- ✅ MCP Client Service (`services/mcpClientService.js`) - WebSocket-based
+- ✅ MCP Configuration (`config/mcpConfig.js`) - Native MCP server configuration
+- ✅ MCP Integration Hook (`hooks/useMCPIntegration.js`) - WebSocket connection management
+- ✅ Enhanced AI Service (`services/enhancedAiService.js`)
+- ✅ Enhanced Chat Components with real tool support
+- ✅ Development testing panel for MCP tools
 
-### 🌐 C# Server Integration
-- ✅ HTTP API endpoints specification
-- ✅ JSON-RPC 2.0 protocol support
-- ✅ CORS configuration guidance
-- ✅ Real-time connection status
-- ✅ Automatic reconnection support
+### 🤖 Enhanced AI Assistant
+- ✅ Real-time WebSocket connection status display
+- ✅ Tool discovery and suggestion via MCP protocol
+- ✅ Intelligent message analysis
+- ✅ Actual tool execution (when MCP server is available)
+- ✅ Fallback to mock responses when MCP is unavailable
 
-## 🚀 Step-by-Step Setup
+## 🚀 How to Connect to Your MCP Server
 
-### Step 1: Start Your C# MCP Server
-Ensure your C# MCP server is running on localhost:5000 with the required endpoints:
-```
-http://localhost:5000/api/health
-http://localhost:5000/api/mcp/initialize
-http://localhost:5000/api/mcp/tools/list
-http://localhost:5000/api/mcp/tools/call
-```
+### Step 1: Update MCP Server Configuration
+Edit `src/config/mcpConfig.js` and update the path to your MCP server:
 
-### Step 2: Enable CORS in Your C# Server
-Add this to your C# server configuration:
-```csharp
-// In Program.cs or Startup.cs
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(builder =>
-    {
-        builder.WithOrigins("http://localhost:3000") // React app URL
-               .AllowAnyMethod()
-               .AllowAnyHeader();
-    });
-});
-
-app.UseCors();
+```javascript
+development: {
+  command: 'node',
+  args: ['../path/to/your-mcp-server/index.js'], // UPDATE THIS
+  env: {
+    ...process.env,
+    NODE_ENV: 'development',
+    MCP_LOG_LEVEL: 'debug'
+  },
+  autoReconnect: true,
+  reconnectDelay: 5000
+}
 ```
 
-### Step 3: Start the React Application
-```bash
-cd /Users/avnishkumar/Documents/infrastructure-configurator
-npm start
-```
+### Step 2: Ensure Your MCP Server Supports WebSocket on localhost:5000
+Your MCP server should:
+- Accept WebSocket connections on `ws://localhost:5000`
+- Implement the MCP protocol (JSON-RPC 2.0 over WebSocket)
+- Support these methods:
+  - `initialize` - MCP handshake
+  - `tools/list` - List available tools
+  - `tools/call` - Execute tools
 
-### Step 4: Test the Connection
-1. Open your React app in the browser (http://localhost:3000)
-2. Look for the **"MCP Tests"** button in the bottom-left corner
-3. Click it to open the MCP Test Panel
-4. Check the connection status indicator:
-   - 🟢 Green = Connected to C# server
-   - 🟡 Yellow = Connecting...
-   - 🔴 Red = Connection failed
+### Step 3: Test the Integration
+1. Start your MCP server on localhost:5000
+2. Start your React app: `npm start`
+3. Look for the **MCP Test Panel** button in the bottom-left (development mode)
+4. Check the AI Assistant connection status (green = connected, red = disconnected)
 
-### Step 5: Verify Tool Integration
-1. In the MCP Test Panel, try the quick test buttons
-2. Check that tools are discovered from your C# server
-3. Verify tool execution works correctly
-4. Monitor the browser console for detailed logs
+## 🔧 MCP Server Requirements
 
-## 🔧 C# Server Requirements
-
-Your C# MCP server must implement these endpoints (see `C_SHARP_MCP_API_SPEC.md` for full details):
-
-### Health Check
-```http
-GET /api/health
-```
+Your MCP server needs to implement these WebSocket message handlers:
 
 ### Initialize Connection
-```http
-POST /api/mcp/initialize
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {
+      "tools": {}
+    },
+    "clientInfo": {
+      "name": "infrastructure-configurator",
+      "version": "1.0.0"
+    }
+  }
+}
 ```
 
-### List Available Tools
-```http
-POST /api/mcp/tools/list
+### List Tools
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list"
+}
 ```
 
-### Execute Tools
-```http
-POST /api/mcp/tools/call
+### Call Tool
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "validate_configuration",
+    "arguments": {
+      "config": "...",
+      "format": "terraform"
+    }
+  }
+}
 ```
 
-## 📊 Recommended Tools for Infrastructure Configurator
+## 🧪 Testing the Integration
 
-Implement these tools in your C# server for best integration:
+### 1. With MCP Server (Real Tools)
+When your MCP server is running:
+- AI shows "🛠️ MCP Tools Connected"
+- Can execute real validation, optimization, and generation tools
+- Provides intelligent suggestions based on actual tool capabilities
 
-1. **analyze_chat_message** - Analyzes user messages and suggests relevant actions
-2. **validate_configuration** - Validates infrastructure configurations
-3. **generate_terraform_config** - Generates Terraform code from requirements
-4. **optimize_resources** - Provides optimization recommendations
-5. **check_system_status** - Checks current system health and status
+### 2. Without MCP Server (Fallback Mode)
+When MCP server is unavailable:
+- AI shows "⚠️ Basic Mode"
+- Falls back to mock responses
+- Still provides helpful guidance and suggestions
+- No real tool execution
 
-## 🧪 Testing Features
+## 🎯 User Experience
 
-### Development Test Panel
-- Quick test buttons for common scenarios
-- Custom message testing
-- Real-time connection status
-- Tool execution timing
-- Error reporting and debugging
+### Before MCP Integration:
+```
+User: "Validate my configuration"
+AI: "🔧 I can help you fix configuration errors! [Generic advice]"
+```
 
-### Connection Test Component
-Available at `/src/components/MCPConnectionTest.js` for standalone testing.
+### After MCP Integration:
+```
+User: "Validate my configuration"  
+AI: "🛠️ I can validate your configuration using our validation tool!
+     Confidence: 85%
+     [Execute Validation Tool] → ✅ Found 2 issues, fixed automatically"
+```
 
-## 🛠️ Enhanced AI Assistant
+## 🛠️ Available Features
 
-The AI Assistant now has:
-- **Real-time connection status** to your C# server
-- **Intelligent tool discovery** from your server's tool list
-- **Actual tool execution** when server is available
-- **Graceful fallback** when server is unavailable
-- **Context-aware suggestions** based on available tools
+### AI Assistant Capabilities
+- **Real Tool Execution**: Actually validates, optimizes, and generates configurations
+- **Intelligent Analysis**: Understands user intent and suggests appropriate tools
+- **Context Awareness**: Considers current configuration step and state
+- **Error Handling**: Graceful fallback when tools aren't available
+
+### Development Tools
+- **MCP Test Panel**: Test tool connections and responses
+- **Debug Information**: See message analysis and tool suggestions
+- **Connection Status**: Visual indicators of MCP server status
 
 ## 🔧 Troubleshooting
 
 ### Common Issues
 
-**1. "Failed to connect to C# MCP server on localhost:5000"**
-- Verify your C# server is running on port 5000
-- Check that the health endpoint responds: `curl http://localhost:5000/api/health`
-- Ensure CORS is configured correctly
+**1. "MCP Connection Failed"**
+- Check that your MCP server is running on localhost:5000
+- Verify it accepts WebSocket connections on `ws://localhost:5000`
+- Check console for detailed error messages
+- Ensure MCP protocol is implemented correctly
 
-**2. "CORS Error"**
-- Add React app origin to CORS policy: `http://localhost:3000`
-- Verify CORS middleware is applied before routing
-- Check browser developer tools for CORS-specific error messages
-
-**3. "No tools available"**
-- Ensure `/api/mcp/tools/list` endpoint returns tool definitions
+**2. "No Tools Available"**
+- Ensure your MCP server implements the `tools/list` method
+- Check that tools are properly registered on the server
 - Verify JSON-RPC 2.0 response format
-- Check that tools are properly registered in your C# server
 
-**4. "Tool execution failed"**
-- Verify tool names match exactly between client and server
-- Check parameter validation in your C# tool implementations
-- Monitor server logs for execution errors
+**3. "Tool Execution Failed"**
+- Verify the tool exists on your MCP server
+- Check tool parameters match expected schema
+- Look at console logs for detailed error info
+- Ensure WebSocket connection is stable
 
 ### Debug Steps
 1. Open browser developer tools (F12)
-2. Check Network tab for HTTP requests to localhost:5000
-3. Use the MCP Test Panel to test individual operations
-4. Check Console tab for detailed error logs
-5. Verify C# server logs for incoming requests
+2. Check console for MCP connection logs
+3. Use the MCP Test Panel to test individual tools
+4. Verify your MCP server is responding to WebSocket requests
+5. Check WebSocket connection in Network tab
 
-## 🎯 Server Implementation Tips
+## 🔌 WebSocket vs HTTP Implementation
 
-### ASP.NET Core Controller Example
-```csharp
-[ApiController]
-[Route("api")]
-public class MCPController : ControllerBase
-{
-    [HttpGet("health")]
-    public IActionResult HealthCheck()
-    {
-        return Ok(new { status = "healthy", timestamp = DateTime.UtcNow });
-    }
+You now have the **native WebSocket MCP implementation**. If you need to switch back to HTTP API integration:
 
-    [HttpPost("mcp/tools/list")]
-    public IActionResult ListTools([FromBody] JsonRpcRequest request)
-    {
-        var tools = GetAvailableTools(); // Your tool discovery logic
-        return Ok(new JsonRpcResponse
-        {
-            jsonrpc = "2.0",
-            id = request.id,
-            result = new { tools }
-        });
-    }
-    
-    // ... other endpoints
-}
-```
-
-### Tool Response Format
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "content": [
-      {
-        "type": "text",
-        "text": "Configuration validation completed successfully!\n\n✅ Syntax: Valid\n❌ Found 2 issues:\n- Missing required tags\n- Deprecated instance type"
-      }
-    ],
-    "isError": false
-  }
-}
-```
+1. The HTTP adapter is available in `src/services/existingApiMCPAdapter.js`
+2. The API Explorer is available in `src/components/ExistingAPIExplorer.js`
+3. Simply change the import in `src/hooks/useMCPIntegration.js` to switch modes
 
 ## 🎉 Next Steps
 
-1. **Implement the required API endpoints** in your C# server
-2. **Add your infrastructure tools** (validation, generation, optimization)
-3. **Test the integration** using the MCP Test Panel
-4. **Customize tool responses** to match your domain needs
-5. **Deploy with confidence** knowing you have real server integration
+1. **Configure your MCP server** to accept WebSocket connections on localhost:5000
+2. **Implement MCP protocol** in your server (JSON-RPC 2.0 over WebSocket)
+3. **Add your infrastructure tools** to the MCP server
+4. **Test the connection** using the development panel
+5. **Customize the AI responses** based on your specific tools
 
-Your infrastructure configurator now connects directly to your C# MCP server and can execute real infrastructure tools! 🚀
+Your infrastructure configurator is now ready for **native MCP integration** with proper WebSocket support! 🚀
 
-## 📝 Files Modified/Created
+## 📝 Key Files (Current State)
 
-- ✅ `src/services/httpMcpClientService.js` - HTTP client for C# server
-- ✅ `src/hooks/useMCPIntegration.js` - Updated for HTTP integration
-- ✅ `src/config/mcpConfig.js` - HTTP server configuration
-- ✅ `src/components/MCPConnectionTest.js` - Standalone test component
-- ✅ `C_SHARP_MCP_API_SPEC.md` - Complete API specification
-- ✅ `MCP_INTEGRATION_GUIDE.md` - This updated guide
+- ✅ `src/services/mcpClientService.js` - Native WebSocket MCP client
+- ✅ `src/hooks/useMCPIntegration.js` - WebSocket integration hook
+- ✅ `src/config/mcpConfig.js` - Native MCP configuration
+- ✅ `src/components/Debug/MCPTestPanel.js` - Testing interface
+- ✅ Alternative files available for HTTP mode if needed

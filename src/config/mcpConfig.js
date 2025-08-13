@@ -4,31 +4,20 @@
  */
 
 export const mcpConfig = {
-  // Development configuration for C# HTTP server
+  // Development configuration (HTTP Transport)
   development: {
-    serverType: 'http',
+    transport: 'http',
     baseUrl: 'http://localhost:5000',
-    endpoints: {
-      health: '/'
-     /* '/api/health',
-      initialize: '/api/mcp/initialize',
-      listTools: '/api/mcp/tools/list',
-      callTool: '/api/mcp/tools/call'*/
-    },
+    endpoint: '/mcp',
     autoReconnect: true,
     reconnectDelay: 5000
   },
   
-  // Production configuration for C# HTTP server
+  // Production configuration (HTTP Transport)
   production: {
-    serverType: 'http',
+    transport: 'http',
     baseUrl: 'http://your-production-server:5000',
-    endpoints: {
-      health: '/api/health',
-      initialize: '/api/mcp/initialize',
-      listTools: '/api/mcp/tools/list',
-      callTool: '/api/mcp/tools/call'
-    },
+    endpoint: '/mcp',
     autoReconnect: true,
     reconnectDelay: 10000
   },

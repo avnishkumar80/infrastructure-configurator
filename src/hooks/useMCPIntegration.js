@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import existingApiMCPAdapter from '../services/existingApiMCPAdapter.js';
+import mcpClientServiceHTTP from '../services/mcpClientServiceHTTP.js';
 
 /**
- * MCP Integration Hook (Existing API Adapter)
- * Manages connection to existing C# API and adapts it for MCP-like usage
+ * MCP Integration Hook (HTTP Transport)
+ * Manages connection to MCP server via HTTP transport and provides tool execution capabilities
  */
 export const useMCPIntegration = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -25,18 +25,24 @@ export const useMCPIntegration = () => {
           env: {} // This won't be used in browser mode
         };
         
-        console.log('🔌 Attempting to connect to existing C# API at localhost:5000...');
+        // MCP HTTP transport server configuration
+        const serverConfig = {
+          baseUrl: 'http://localhost:5000',
+          transport: 'http'
+        };
+        
+        console.log('🔌 Attempting MCP connection via HTTP transport...');
 
-        const connected = await existingApiMCPAdapter.connect();
+        const connected = await mcpClientServiceHTTP.connect(serverConfig);
         setIsConnected(connected);
         
         if (connected) {
-          const tools = existingApiMCPAdapter.getAvailableTools();
+          const tools = mcpClientServiceHTTP.getAvailableTools();
           setAvailableTools(tools);
-          console.log('✅ Existing API integration successful');
+          console.log('✅ MCP HTTP Transport Integration successful');
         } else {
-          setConnectionError('Failed to connect to existing C# API on localhost:5000');
-          console.log('❌ Existing API integration failed');
+          setConnectionError('Failed to connect to MCP server via HTTP transport');
+          console.log('❌ MCP HTTP Transport Integration failed');
           setAvailableTools([]);
         }
       } catch (error) {
@@ -53,7 +59,7 @@ export const useMCPIntegration = () => {
 
     // Cleanup on unmount
     return () => {
-      existingApiMCPAdapter.disconnect();
+      mcpClientServiceHTTP.disconnect();
     };
   }, []);
 
@@ -69,7 +75,7 @@ export const useMCPIntegration = () => {
     }
 
     try {
-      const result = await existingApiMCPAdapter.callTool(toolName, parameters);
+      const result = await mcpClientServiceHTTP.callTool(toolName, parameters);
       return result;
     } catch (error) {
       console.error(`Error calling tool ${toolName}:`, error);
@@ -86,7 +92,7 @@ export const useMCPIntegration = () => {
     if (!isConnected) return [];
     
     try {
-      const tools = await existingApiMCPAdapter.refreshAvailableTools();
+      const tools = await mcpClientServiceHTTP.refreshAvailableTools();
       setAvailableTools(tools);
       return tools;
     } catch (error) {
@@ -100,11 +106,11 @@ export const useMCPIntegration = () => {
     setConnectionError(null);
     
     try {
-      const connected = await existingApiMCPAdapter.reconnect();
+      const connected = await mcpClientServiceHTTP.reconnect();
       setIsConnected(connected);
       
       if (connected) {
-        const tools = existingApiMCPAdapter.getAvailableTools();
+        const tools = mcpClientServiceHTTP.getAvailableTools();
         setAvailableTools(tools);
       }
       
@@ -123,11 +129,19 @@ export const useMCPIntegration = () => {
       isConnecting,
       toolCount: availableTools.length,
       error: connectionError,
-      ...existingApiMCPAdapter.getConnectionStatus()
+      ...mcpClientServiceHTTP.getConnectionStatus()
     };
   }, [isConnected, isConnecting, availableTools.length, connectionError]);
 
-  // Remove the mock mode methods since HTTP client doesn't need them
+  // Methods to control mock/real mode (HTTP transport compatible)
+  const enableMockMode = useCallback(() => {
+    mcpClientServiceHTTP.enableMockMode();
+  }, []);
+
+  const enableRealMode = useCallback(() => {
+    mcpClientServiceHTTP.enableRealMode();
+  }, []);
+
   return {
     // Connection state
     isConnected,
@@ -142,6 +156,10 @@ export const useMCPIntegration = () => {
     refreshTools,
     reconnect,
     getConnectionStatus,
+    
+    // Mode control
+    enableMockMode,
+    enableRealMode,
     
     // Utility functions
     isToolAvailable: useCallback((toolName) => {
