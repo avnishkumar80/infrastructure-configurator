@@ -8,6 +8,7 @@ class LLMService {
     this.baseUrl = 'http://apurl.com/v1';
     this.modelName = 'gpt-oss-120b';
     this.apiKey = 'your-token-here'; // We'll configure this
+    this.useCorsProxy = false; // Set to true if CORS is blocking
   }
 
   async analyzeUserQuery(userMessage, availableTools, currentContext = {}) {
@@ -136,22 +137,34 @@ Generate a helpful response to the user based on their request and any tool resu
       messageCount: messages.length 
     });
 
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`
-      },
-      body: JSON.stringify(requestBody)
-    });
+    try {
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`LLM API error: ${response.status} ${response.statusText} - ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`LLM API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (error) {
+      // More detailed error handling for CORS issues
+      if (error.message.includes('CORS') || error.message.includes('Access-Control')) {
+        throw new Error(`CORS Error: Your LLM server needs to allow requests from ${window.location.origin}. Add CORS headers to your server.`);
+      } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        throw new Error(`Network Error: Cannot reach ${this.baseUrl}. Check if the server is running and URL is correct.`);
+      }
+      throw error;
     }
-
-    const data = await response.json();
-    return data.choices[0].message.content;
   }
 
   parseAnalysisResponse(response) {

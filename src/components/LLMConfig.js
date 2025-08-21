@@ -159,6 +159,23 @@ export const LLMConfig = () => {
           ) : (
             <div className="text-sm text-red-700">
               <div><strong>Error:</strong> {testResult.error}</div>
+              
+              {/* CORS-specific help */}
+              {testResult.error.includes('CORS') && (
+                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                  <div className="font-medium text-yellow-800">🔧 CORS Fix Required</div>
+                  <div className="text-xs text-yellow-700 mt-1">
+                    Your LLM server needs to allow requests from: <code>{window.location.origin}</code>
+                    <br />
+                    Add these headers to your server:
+                    <pre className="mt-1 text-xs bg-yellow-100 p-1 rounded">
+{`Access-Control-Allow-Origin: ${window.location.origin}
+Access-Control-Allow-Methods: POST, OPTIONS
+Access-Control-Allow-Headers: Content-Type, Authorization`}
+                    </pre>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -175,6 +192,26 @@ export const LLMConfig = () => {
           <li>Test the connection to verify it works</li>
           <li>Once connected, the AI assistant will use LLM for intelligent responses</li>
         </ol>
+        
+        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
+          <h4 className="font-medium text-yellow-800">🔧 CORS Configuration Required</h4>
+          <div className="text-xs text-yellow-700 mt-1">
+            If you get CORS errors, add these headers to your LLM server:
+            <pre className="mt-1 text-xs bg-yellow-100 p-2 rounded overflow-auto">
+{`# For your LLM server, add CORS headers:
+Access-Control-Allow-Origin: ${window.location.origin}
+Access-Control-Allow-Methods: POST, OPTIONS
+Access-Control-Allow-Headers: Content-Type, Authorization, Accept
+
+# Example for Express.js:
+app.use(cors({
+  origin: '${window.location.origin}',
+  methods: ['POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+}));`}
+            </pre>
+          </div>
+        </div>
         
         <div className="mt-3 text-xs text-gray-600">
           Configuration is saved locally in your browser
