@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Brain, Settings, CheckCircle, AlertCircle, Loader } from 'lucide-react';
-import llmService from '../../services/llmService';
+import llmService from '../services/llmService';
 
 /**
  * LLM Configuration Component
