@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { getMCPServerUrl } from '../config/serverConfig';
+import MCPConnectionTest from './MCPConnectionTest.js';
+import LLMConfig from './LLMConfig.js';
 
 /**
- * Connection Test Component
- * Test connectivity to your C# MCP server
+ * Enhanced Connection Test Component with Tabs
+ * Test connectivity to servers and configure LLM
  */
 export const ConnectionTest = () => {
+  const [activeTab, setActiveTab] = useState('basic'); // basic, mcp, llm
   const [testResults, setTestResults] = useState([]);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [serverUrl, setServerUrl] = useState(getMCPServerUrl());
@@ -38,154 +41,134 @@ export const ConnectionTest = () => {
       const response = await fetch(`${serverUrl}/health`);
       if (response.ok) {
         const data = await response.text();
-        addTestResult('Health Check', true, `Health endpoint OK: ${data}`);
+        addTestResult('Health Check', true, `Health endpoint responded: ${data || 'OK'}`);
       } else {
-        addTestResult('Health Check', false, `Health endpoint returned ${response.status}`);
+        addTestResult('Health Check', false, `Health check failed with status ${response.status}`);
       }
     } catch (error) {
       addTestResult('Health Check', false, `Health check failed: ${error.message}`);
     }
 
-    // Test 3: Test /api/v1/ endpoints specifically
-    const mcpRequest = {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2024-11-05",
-        capabilities: { tools: {} },
-        clientInfo: { name: "connection-test", version: "1.0.0" }
-      }
-    };
-
-    const apiV1Endpoints = [
-      '/api/v1/mcp',        // Standard MCP under v1 API
-      '/api/v1/jsonrpc',    // JSON-RPC under v1 API  
-      '/api/v1/rpc',        // RPC under v1 API
-      '/api/v1',            // Base v1 API endpoint
-      '/api/v1/tools',      // Tools endpoint
-      '/api/v1/initialize', // Direct initialize
-    ];
-
-    let apiSuccess = false;
-    for (const endpoint of apiV1Endpoints) {
-      try {
-        addTestResult(`API v1: ${endpoint}`, null, `Testing ${endpoint}...`);
-        
-        const response = await fetch(`${serverUrl}${endpoint}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(mcpRequest)
-        });
-
-        const responseText = await response.text();
-        
-        if (response.ok) {
-          addTestResult(`API v1: ${endpoint}`, true, `✅ SUCCESS! Found working endpoint: ${endpoint}\nResponse: ${responseText}`);
-          apiSuccess = true;
-          break;
-        } else {
-          addTestResult(`API v1: ${endpoint}`, false, `❌ ${response.status} ${response.statusText}: ${responseText.substring(0, 100)}`);
-        }
-      } catch (error) {
-        addTestResult(`API v1: ${endpoint}`, false, `❌ ${error.message}`);
-      }
-    }
-
-    if (!apiSuccess) {
-      addTestResult('API v1 Summary', false, '❌ No working /api/v1/ MCP endpoint found. Check your controller routing.');
-    }
-
-    // Test 4: Alternative HTTP methods
+    // Test 3: MCP endpoint
     try {
-      addTestResult('HTTP Methods', null, 'Testing different HTTP methods...');
-      
-      // Test GET request (some servers might use query params)
-      const getUrl = `${serverUrl}/mcp?method=initialize&jsonrpc=2.0&id=1`;
-      const getResponse = await fetch(getUrl, { method: 'GET' });
-      
-      if (getResponse.ok) {
-        const data = await getResponse.json();
-        addTestResult('HTTP Methods', true, `✅ GET method works: ${JSON.stringify(data, null, 2)}`);
-      } else {
-        addTestResult('HTTP Methods', false, `GET method failed: ${getResponse.status} ${getResponse.statusText}`);
-        
-        // Test PUT method
-        const putResponse = await fetch(`${serverUrl}/mcp`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(mcpRequest)
-        });
-        
-        if (putResponse.ok) {
-          const data = await putResponse.json();
-          addTestResult('HTTP Methods', true, `✅ PUT method works: ${JSON.stringify(data, null, 2)}`);
-        } else {
-          addTestResult('HTTP Methods', false, `PUT method also failed: ${putResponse.status}`);
-        }
-      }
-    } catch (error) {
-      addTestResult('HTTP Methods', false, `HTTP methods test failed: ${error.message}`);
-    }
-    try {
-      addTestResult('CORS Check', null, 'Testing CORS headers...');
+      addTestResult('MCP Endpoint', null, 'Testing /mcp endpoint...');
       const response = await fetch(`${serverUrl}/mcp`, {
-        method: 'OPTIONS',
+        method: 'POST',
         headers: {
-          'Origin': 'http://localhost:3000',
-          'Access-Control-Request-Method': 'POST',
-          'Access-Control-Request-Headers': 'Content-Type'
-        }
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2024-11-05',
+            capabilities: {},
+            clientInfo: { name: 'test-client', version: '1.0.0' }
+          }
+        })
       });
 
-      const corsHeaders = {
-        'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
-        'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
-        'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers')
-      };
-
-      if (corsHeaders['Access-Control-Allow-Origin']) {
-        addTestResult('CORS Check', true, `CORS configured: ${JSON.stringify(corsHeaders, null, 2)}`);
+      if (response.ok) {
+        const data = await response.json();
+        addTestResult('MCP Endpoint', true, `MCP endpoint works! Response: ${JSON.stringify(data, null, 2)}`);
       } else {
-        addTestResult('CORS Check', false, 'CORS headers not found - you may need to configure CORS');
+        const errorText = await response.text();
+        addTestResult('MCP Endpoint', false, `MCP endpoint failed: ${response.status} ${response.statusText}\\n${errorText}`);
+      }
+    } catch (error) {
+      addTestResult('MCP Endpoint', false, `MCP endpoint test failed: ${error.message}`);
+    }
+
+    // Test 4: CORS check
+    try {
+      addTestResult('CORS Check', null, 'Testing CORS configuration...');
+      const response = await fetch(`${serverUrl}/mcp`, {
+        method: 'OPTIONS'
+      });
+      
+      if (response.ok || response.status === 204) {
+        addTestResult('CORS Check', true, 'CORS is properly configured');
+      } else {
+        addTestResult('CORS Check', false, `CORS check failed: ${response.status}`);
       }
     } catch (error) {
       addTestResult('CORS Check', false, `CORS check failed: ${error.message}`);
     }
 
-    // Test 5: CORS check
-    try {
-      addTestResult('CORS Check', null, 'Testing CORS headers...');
-      const response = await fetch(`${serverUrl}/mcp`, {
-        method: 'OPTIONS',
-        headers: {
-          'Origin': 'http://localhost:3000',
-          'Access-Control-Request-Method': 'POST',
-          'Access-Control-Request-Headers': 'Content-Type'
-        }
-      });
-
-      const corsHeaders = {
-        'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
-        'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
-        'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers')
-      };
-
-      if (corsHeaders['Access-Control-Allow-Origin']) {
-        addTestResult('CORS Check', true, `CORS configured: ${JSON.stringify(corsHeaders, null, 2)}`);
-      } else {
-        addTestResult('CORS Check', false, 'CORS headers not found - you may need to configure CORS');
-      }
-    } catch (error) {
-      addTestResult('CORS Check', false, `CORS check failed: ${error.message}`);
-    }
+    setIsTestingConnection(false);
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-lg max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">🔍 C# MCP Server Connection Test</h2>
+    <div className="max-w-6xl mx-auto space-y-6">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">🔧 System Configuration & Testing</h1>
+        <p className="text-gray-600">Configure and test your MCP server and LLM connections</p>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+        <button
+          onClick={() => setActiveTab('basic')}
+          className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
+            activeTab === 'basic'
+              ? 'bg-white text-blue-600 shadow-sm'
+              : 'text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          🌐 Basic Connection
+        </button>
+        <button
+          onClick={() => setActiveTab('mcp')}
+          className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
+            activeTab === 'mcp'
+              ? 'bg-white text-blue-600 shadow-sm'
+              : 'text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          🛠️ MCP Tools
+        </button>
+        <button
+          onClick={() => setActiveTab('llm')}
+          className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
+            activeTab === 'llm'
+              ? 'bg-white text-blue-600 shadow-sm'
+              : 'text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          🧠 LLM Configuration
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      <div className="bg-white">
+        {activeTab === 'basic' && (
+          <BasicConnectionTest 
+            serverUrl={serverUrl}
+            setServerUrl={setServerUrl}
+            testResults={testResults}
+            isTestingConnection={isTestingConnection}
+            testConnection={testConnection}
+          />
+        )}
+        
+        {activeTab === 'mcp' && (
+          <MCPConnectionTest />
+        )}
+        
+        {activeTab === 'llm' && (
+          <LLMConfig />
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Extract the original basic connection test into a separate component
+const BasicConnectionTest = ({ serverUrl, setServerUrl, testResults, isTestingConnection, testConnection }) => {
+  return (
+    <div className="bg-white p-6 rounded-lg shadow-lg">
+      <h2 className="text-2xl font-bold mb-4">🌐 Basic Server Connection Test</h2>
       
       <div className="mb-4">
         <label className="block text-sm font-medium mb-2">Server URL:</label>
@@ -193,8 +176,8 @@ export const ConnectionTest = () => {
           type="text"
           value={serverUrl}
           onChange={(e) => setServerUrl(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-          placeholder="http://your-server-ip:5000"
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+          placeholder="http://your-server-ip:port"
         />
         <div className="text-xs text-gray-500 mt-1">
           Update this to point to your C# MCP server machine

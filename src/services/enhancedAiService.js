@@ -1,5 +1,6 @@
 import { mockAIResponses } from '../utils/mockData.js';
 import mcpClientService from './mcpClientServiceHTTP.js';
+import llmService from './llmService.js';
 
 /**
  * Enhanced AI Service with MCP Integration (Browser Compatible)
@@ -32,6 +33,17 @@ export class EnhancedAiService {
     try {
       console.log('🤖 Processing with MCP - Available tools:', mcpClientService.getAvailableTools().map(t => t.name));
       
+      // Check if LLM is configured and available
+      const llmConfig = llmService.getConfig();
+      const useLLM = llmConfig.hasApiKey && llmConfig.baseUrl;
+      
+      if (useLLM) {
+        console.log('🧠 Using LLM for intelligent processing');
+        return await this.processWithLLM(userMessage, currentContext);
+      }
+      
+      console.log('📝 Using pattern-based processing (LLM not configured)');
+      
       // First, check if user is asking for tool list
       if (userMessage.toLowerCase().includes('list') && (userMessage.toLowerCase().includes('tool') || userMessage.toLowerCase().includes('command'))) {
         return this.generateToolListResponse();
@@ -51,12 +63,82 @@ export class EnhancedAiService {
         }
       }
       
+      // Check if user wants to use a specific tool
+      const toolRequest = this.detectToolRequest(userMessage);
+      if (toolRequest.toolName && mcpClientService.isToolAvailable(toolRequest.toolName)) {
+        return this.generateToolExecutionResponse(toolRequest.toolName, toolRequest.parameters, userMessage);
+      }
+      
       // If no specific tool or analysis failed, provide tool-aware response
       return this.generateToolAwareResponse(userMessage, currentContext);
       
     } catch (error) {
       console.error('Error processing with MCP:', error);
       return this.processFallback(userMessage, currentContext);
+    }
+  }
+
+  async processWithLLM(userMessage, currentContext) {
+    try {
+      const availableTools = mcpClientService.getAvailableTools();
+      
+      // Step 1: LLM analyzes the query
+      console.log('🧠 Step 1: LLM analyzing user query...');
+      const analysis = await llmService.analyzeUserQuery(userMessage, availableTools, currentContext);
+      console.log('🔍 LLM Analysis:', analysis);
+      
+      // Step 2: Execute suggested tools if any
+      let toolResults = [];
+      if (analysis.suggestedTools && analysis.suggestedTools.length > 0) {
+        console.log('🛠️ Step 2: Executing suggested tools...');
+        
+        for (const toolSuggestion of analysis.suggestedTools.slice(0, 2)) { // Limit to 2 tools max
+          if (mcpClientService.isToolAvailable(toolSuggestion.tool_name)) {
+            try {
+              const result = await mcpClientService.callTool(
+                toolSuggestion.tool_name, 
+                toolSuggestion.parameters || {}
+              );
+              toolResults.push({
+                toolName: toolSuggestion.tool_name,
+                success: result.success,
+                result: result.result,
+                error: result.error
+              });
+              console.log(`✅ Tool ${toolSuggestion.tool_name} executed:`, result.success);
+            } catch (error) {
+              console.error(`❌ Tool ${toolSuggestion.tool_name} failed:`, error);
+              toolResults.push({
+                toolName: toolSuggestion.tool_name,
+                success: false,
+                error: error.message
+              });
+            }
+          }
+        }
+      }
+      
+      // Step 3: LLM generates final response
+      console.log('🧠 Step 3: LLM generating final response...');
+      const finalResponse = await llmService.generateResponse(userMessage, toolResults, availableTools);
+      
+      return {
+        response: {
+          type: 'llm_powered',
+          content: finalResponse
+        },
+        analysis: {
+          llmAnalysis: analysis,
+          toolsExecuted: toolResults.length,
+          toolResults: toolResults
+        },
+        suggestedActions: this.generateLLMSuggestedActions(analysis, toolResults)
+      };
+      
+    } catch (error) {
+      console.error('LLM processing failed:', error);
+      // Fallback to pattern-based processing
+      return this.generateToolAwareResponse(userMessage, currentContext);
     }
   }
 
@@ -307,6 +389,129 @@ export class EnhancedAiService {
     }
     
     return JSON.stringify(result, null, 2);
+  }
+
+  detectToolRequest(userMessage) {
+    const lowerMessage = userMessage.toLowerCase();
+    const availableTools = mcpClientService.getAvailableTools();
+    
+    // Direct tool name mentions
+    for (const tool of availableTools) {
+      const toolName = tool.name.toLowerCase();
+      if (lowerMessage.includes(toolName) || 
+          lowerMessage.includes(`use ${toolName}`) ||
+          lowerMessage.includes(`run ${toolName}`) ||
+          lowerMessage.includes(`execute ${toolName}`)) {
+        return {
+          toolName: tool.name,
+          parameters: this.extractParametersFromMessage(userMessage, tool),
+          confidence: 0.9
+        };
+      }
+    }
+    
+    // Intent-based tool detection
+    const intentMap = {
+      'validate': ['validate', 'check', 'verify', 'test'],
+      'analyze': ['analyze', 'analysis', 'examine', 'review'],
+      'recommend': ['recommend', 'suggest', 'advice', 'best'],
+      'fix': ['fix', 'repair', 'solve', 'resolve'],
+      'generate': ['generate', 'create', 'build', 'make'],
+      'optimize': ['optimize', 'improve', 'enhance', 'better']
+    };
+    
+    for (const [intentKey, keywords] of Object.entries(intentMap)) {
+      if (keywords.some(keyword => lowerMessage.includes(keyword))) {
+        const matchingTool = availableTools.find(tool => 
+          tool.name.toLowerCase().includes(intentKey) ||
+          (tool.description && tool.description.toLowerCase().includes(intentKey))
+        );
+        
+        if (matchingTool) {
+          return {
+            toolName: matchingTool.name,
+            parameters: this.extractParametersFromMessage(userMessage, matchingTool),
+            confidence: 0.7
+          };
+        }
+      }
+    }
+    
+    return { toolName: null, parameters: {}, confidence: 0 };
+  }
+
+  extractParametersFromMessage(userMessage, tool) {
+    // Basic parameter extraction - can be enhanced based on tool schemas
+    const params = {
+      message: userMessage,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Add more sophisticated parameter extraction here based on tool.inputSchema
+    return params;
+  }
+
+  generateToolExecutionResponse(toolName, parameters, originalMessage) {
+    const tool = mcpClientService.getAvailableTools().find(t => t.name === toolName);
+    
+    return {
+      response: {
+        type: 'tool_execution_request',
+        content: `🛠️ **Ready to execute: ${toolName}**\n\n${tool.description || 'No description available'}\n\nI'll run this tool with the following parameters:\n\`\`\`json\n${JSON.stringify(parameters, null, 2)}\n\`\`\`\n\nShould I proceed?`,
+        needsConfirmation: true,
+        suggestedTool: {
+          tool_name: toolName,
+          suggested_parameters: parameters,
+          tool_info: tool
+        }
+      },
+      analysis: {
+        detectedTool: toolName,
+        parameters: parameters,
+        originalMessage: originalMessage
+      },
+      suggestedActions: [
+        {
+          type: 'tool_execution',
+          label: `Execute ${toolName}`,
+          toolName: toolName,
+          parameters: parameters,
+          description: `Run the ${toolName} tool`
+        }
+      ]
+    };
+  }
+
+  generateLLMSuggestedActions(analysis, toolResults) {
+    const actions = [];
+    
+    // Add follow-up tool suggestions
+    if (analysis.suggestedTools) {
+      const unexecutedTools = analysis.suggestedTools.filter(tool => 
+        !toolResults.some(result => result.toolName === tool.tool_name)
+      );
+      
+      unexecutedTools.slice(0, 2).forEach(tool => {
+        actions.push({
+          type: 'tool_execution',
+          label: `Use ${tool.tool_name}`,
+          toolName: tool.tool_name,
+          parameters: tool.parameters || {},
+          description: tool.reasoning || 'Execute this tool'
+        });
+      });
+    }
+    
+    // Add clarification actions if needed
+    if (analysis.requiresClarification) {
+      actions.push({
+        type: 'clarification',
+        label: 'Ask for clarification',
+        description: 'Get more specific information'
+      });
+    }
+    
+    return actions;
   }
 }
 
