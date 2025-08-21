@@ -77,15 +77,57 @@ export const LLMConfig = () => {
 
       {/* Configuration Form */}
       <div className="space-y-4 mb-6">
+        {/* Quick Setup Presets */}
+        <div className="p-3 bg-gray-50 rounded-lg">
+          <h4 className="font-medium mb-2">🚀 Quick Setup</h4>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setConfig({
+                baseUrl: 'https://api.anthropic.com',
+                modelName: 'claude-3-5-sonnet-20241022',
+                apiKey: config.apiKey || 'sk-ant-api03-your-key-here'
+              })}
+              className="px-3 py-1 bg-purple-100 text-purple-700 rounded text-sm hover:bg-purple-200"
+            >
+              🤖 Claude 3.5 Sonnet
+            </button>
+            <button
+              onClick={() => setConfig({
+                baseUrl: 'https://api.openai.com/v1',
+                modelName: 'gpt-4',
+                apiKey: config.apiKey || 'sk-your-openai-key-here'
+              })}
+              className="px-3 py-1 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200"
+            >
+              🧠 OpenAI GPT-4
+            </button>
+            <button
+              onClick={() => setConfig({
+                baseUrl: 'http://your-llm-server.com/v1',
+                modelName: 'gpt-oss-120b',
+                apiKey: config.apiKey || 'your-api-token-here'
+              })}
+              className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200"
+            >
+              🏠 Local Server
+            </button>
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-medium mb-2">API Base URL</label>
           <input
             type="text"
             value={config.baseUrl}
             onChange={(e) => handleConfigChange('baseUrl', e.target.value)}
-            placeholder="http://your-llm-server.com/v1"
+            placeholder="https://api.anthropic.com"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
+          <div className="text-xs text-gray-500 mt-1">
+            • Claude: https://api.anthropic.com
+            • OpenAI: https://api.openai.com/v1  
+            • Local: http://your-server.com/v1
+          </div>
         </div>
 
         <div>
@@ -94,9 +136,14 @@ export const LLMConfig = () => {
             type="text"
             value={config.modelName}
             onChange={(e) => handleConfigChange('modelName', e.target.value)}
-            placeholder="gpt-oss-120b"
+            placeholder="claude-3-5-sonnet-20241022"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
+          <div className="text-xs text-gray-500 mt-1">
+            • Claude: claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022
+            • OpenAI: gpt-4, gpt-3.5-turbo
+            • Local: your-model-name
+          </div>
         </div>
 
         <div>
@@ -105,9 +152,13 @@ export const LLMConfig = () => {
             type="password"
             value={config.apiKey}
             onChange={(e) => handleConfigChange('apiKey', e.target.value)}
-            placeholder="your-api-token-here"
+            placeholder="sk-ant-api03-... (for Claude) or sk-... (for OpenAI)"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
+          <div className="text-xs text-gray-500 mt-1">
+            • Claude: Get from https://console.anthropic.com
+            • OpenAI: Get from https://platform.openai.com
+          </div>
         </div>
       </div>
 

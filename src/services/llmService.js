@@ -123,6 +123,56 @@ Generate a helpful response to the user based on their request and any tool resu
   }
 
   async callLLM(messages, options = {}) {
+    // Detect if using Claude API
+    const isClaudeAPI = this.baseUrl.includes('anthropic.com');
+    
+    if (isClaudeAPI) {
+      return await this.callClaudeAPI(messages, options);
+    } else {
+      return await this.callOpenAICompatibleAPI(messages, options);
+    }
+  }
+
+  async callClaudeAPI(messages, options = {}) {
+    const requestBody = {
+      model: this.modelName,
+      max_tokens: options.max_tokens || 1000,
+      messages: messages,
+      temperature: options.temperature || 0.7
+    };
+
+    console.log('🤖 Calling Claude API with:', { 
+      url: `${this.baseUrl}/v1/messages`,
+      model: this.modelName,
+      messageCount: messages.length 
+    });
+
+    try {
+      const response = await fetch(`${this.baseUrl}/v1/messages`, {
+        method: 'POST',
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Claude API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      return data.content[0].text;
+    } catch (error) {
+      this.handleAPIError(error);
+    }
+  }
+
+  async callOpenAICompatibleAPI(messages, options = {}) {
     const requestBody = {
       model: this.modelName,
       messages: messages,
@@ -131,7 +181,7 @@ Generate a helpful response to the user based on their request and any tool resu
       stream: false
     };
 
-    console.log('🤖 Calling LLM with:', { 
+    console.log('🤖 Calling OpenAI-compatible API with:', { 
       url: `${this.baseUrl}/chat/completions`,
       model: this.modelName,
       messageCount: messages.length 
@@ -157,14 +207,22 @@ Generate a helpful response to the user based on their request and any tool resu
       const data = await response.json();
       return data.choices[0].message.content;
     } catch (error) {
-      // More detailed error handling for CORS issues
-      if (error.message.includes('CORS') || error.message.includes('Access-Control')) {
-        throw new Error(`CORS Error: Your LLM server needs to allow requests from ${window.location.origin}. Add CORS headers to your server.`);
-      } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-        throw new Error(`Network Error: Cannot reach ${this.baseUrl}. Check if the server is running and URL is correct.`);
-      }
-      throw error;
+      this.handleAPIError(error);
     }
+  }
+
+  handleAPIError(error) {
+    // Enhanced error handling for different APIs
+    if (error.message.includes('CORS') || error.message.includes('Access-Control')) {
+      throw new Error(`CORS Error: API server needs to allow requests from ${window.location.origin}. This shouldn't happen with official APIs like Claude/OpenAI.`);
+    } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+      throw new Error(`Network Error: Cannot reach ${this.baseUrl}. Check if the URL is correct and you have internet access.`);
+    } else if (error.message.includes('401') || error.message.includes('403')) {
+      throw new Error(`Authentication Error: Invalid API key. Please check your token.`);
+    } else if (error.message.includes('429')) {
+      throw new Error(`Rate Limit Error: You've exceeded the API rate limit. Wait a moment and try again.`);
+    }
+    throw error;
   }
 
   parseAnalysisResponse(response) {
