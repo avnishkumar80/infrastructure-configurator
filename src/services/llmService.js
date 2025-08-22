@@ -3,12 +3,19 @@
  * Integrates with OpenAI-compatible API to analyze queries and generate responses
  */
 
+import { LLM_CONFIG, getAutoLLMConfig } from '../config/llmConfig.js';
+
 class LLMService {
   constructor() {
-    this.baseUrl = 'http://apurl.com/v1';
-    this.modelName = 'gpt-oss-120b';
-    this.apiKey = 'your-token-here'; // We'll configure this
+    // Use embedded configuration by default
+    const autoConfig = getAutoLLMConfig();
+    this.baseUrl = autoConfig.baseUrl;
+    this.modelName = autoConfig.modelName;
+    this.apiKey = autoConfig.apiKey;
+    this.isEmbeddedConfig = true;
     this.useCorsProxy = false; // Set to true if CORS is blocking
+    
+    console.log('🤖 LLM Service initialized with embedded config:', autoConfig.name);
   }
 
   async analyzeUserQuery(userMessage, availableTools, currentContext = {}) {
@@ -138,31 +145,31 @@ Generate a helpful response to the user based on their request and any tool resu
       model: this.modelName,
       max_tokens: options.max_tokens || 1000,
       messages: messages,
-      temperature: options.temperature || 0.7
+      temperature: options.temperature || 0.7,
+      apiKey: this.apiKey
     };
 
-    console.log('🤖 Calling Claude API with:', { 
-      url: `${this.baseUrl}/v1/messages`,
+    // Use proxy server to avoid CORS issues
+    const proxyUrl = 'http://localhost:3001/api/claude/messages';
+    
+    console.log('🤖 Calling Claude API via proxy:', { 
+      url: proxyUrl,
       model: this.modelName,
       messageCount: messages.length 
     });
 
     try {
-      const response = await fetch(`${this.baseUrl}/v1/messages`, {
+      const response = await fetch(proxyUrl, {
         method: 'POST',
-        mode: 'cors',
         headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.apiKey,
-          'anthropic-version': '2023-06-01',
-          'Accept': 'application/json'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Claude API error: ${response.status} ${response.statusText} - ${errorText}`);
+        const errorData = await response.json();
+        throw new Error(`Claude API error: ${response.status} - ${errorData.error || errorData.details || 'Unknown error'}`);
       }
 
       const data = await response.json();
@@ -256,21 +263,49 @@ Generate a helpful response to the user based on their request and any tool resu
   // Configuration methods
   setApiKey(apiKey) {
     this.apiKey = apiKey;
+    this.isEmbeddedConfig = false;
   }
 
   setBaseUrl(baseUrl) {
     this.baseUrl = baseUrl.replace(/\/+$/, ''); // Remove trailing slashes
+    this.isEmbeddedConfig = false;
   }
 
   setModelName(modelName) {
     this.modelName = modelName;
+    this.isEmbeddedConfig = false;
+  }
+
+  // Use embedded configuration presets
+  useEmbeddedConfig(configName) {
+    const config = LLM_CONFIG[configName];
+    if (config) {
+      this.baseUrl = config.baseUrl;
+      this.modelName = config.modelName;
+      this.apiKey = config.apiKey;
+      this.isEmbeddedConfig = true;
+      console.log(`🔄 Switched to embedded config: ${config.name}`);
+      return true;
+    }
+    return false;
+  }
+
+  // Get available embedded configurations
+  getAvailableConfigs() {
+    return Object.keys(LLM_CONFIG).map(key => ({
+      key,
+      name: LLM_CONFIG[key].name,
+      corsSupport: LLM_CONFIG[key].corsSupport
+    }));
   }
 
   getConfig() {
     return {
       baseUrl: this.baseUrl,
       modelName: this.modelName,
-      hasApiKey: !!this.apiKey
+      hasApiKey: !!this.apiKey,
+      isEmbeddedConfig: this.isEmbeddedConfig,
+      availableConfigs: this.getAvailableConfigs()
     };
   }
 

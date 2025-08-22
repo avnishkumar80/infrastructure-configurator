@@ -36,7 +36,12 @@ export const LLMConfig = () => {
     alert('LLM configuration saved!');
   };
 
-  const handleTestConnection = async () => {
+  const handleConfigChange = (field, value) => {
+    setConfig(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
     setIsTesting(true);
     setTestResult(null);
 
@@ -60,11 +65,17 @@ export const LLMConfig = () => {
     setIsTesting(false);
   };
 
-  const handleConfigChange = (field, value) => {
-    setConfig(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  const handleUseEmbeddedConfig = (configKey) => {
+    const success = llmService.useEmbeddedConfig(configKey);
+    if (success) {
+      const newConfig = llmService.getConfig();
+      setConfig({
+        baseUrl: newConfig.baseUrl,
+        modelName: newConfig.modelName,
+        apiKey: '*** USING EMBEDDED KEY ***'
+      });
+      alert(`Switched to embedded configuration: ${configKey}`);
+    }
   };
 
   return (
@@ -77,10 +88,54 @@ export const LLMConfig = () => {
 
       {/* Configuration Form */}
       <div className="space-y-4 mb-6">
-        {/* Quick Setup Presets */}
-        <div className="p-3 bg-gray-50 rounded-lg">
-          <h4 className="font-medium mb-2">🚀 Quick Setup</h4>
+        {/* Embedded Configurations */}
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+          <h4 className="font-medium mb-2 text-green-800">🔐 Use Embedded Configuration (No Setup Required)</h4>
+          <p className="text-xs text-green-700 mb-3">
+            Click a button to use pre-configured API keys embedded in the app code. Perfect for demos and development.
+          </p>
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => handleUseEmbeddedConfig('openrouter')}
+              className="px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center space-x-1"
+            >
+              <span>🌐</span>
+              <span>Use OpenRouter (Recommended)</span>
+            </button>
+            <button
+              onClick={() => handleUseEmbeddedConfig('openai')}
+              className="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 flex items-center space-x-1"
+            >
+              <span>🧠</span>
+              <span>Use OpenAI</span>
+            </button>
+            <button
+              onClick={() => handleUseEmbeddedConfig('custom')}
+              className="px-3 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 flex items-center space-x-1"
+            >
+              <span>🏠</span>
+              <span>Use Your Server</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Manual Configuration */}
+        <div className="p-3 bg-gray-50 rounded-lg">
+          <h4 className="font-medium mb-2">⚙️ Manual Configuration (Optional)</h4>
+          <p className="text-xs text-gray-600 mb-3">
+            Or configure manually with your own API keys:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setConfig({
+                baseUrl: 'https://openrouter.ai/api/v1',
+                modelName: 'anthropic/claude-3.5-sonnet',
+                apiKey: config.apiKey || 'sk-or-v1-your-openrouter-key'
+              })}
+              className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded text-sm hover:bg-indigo-200"
+            >
+              🌐 Claude via OpenRouter
+            </button>
             <button
               onClick={() => setConfig({
                 baseUrl: 'https://api.anthropic.com',
@@ -89,7 +144,7 @@ export const LLMConfig = () => {
               })}
               className="px-3 py-1 bg-purple-100 text-purple-700 rounded text-sm hover:bg-purple-200"
             >
-              🤖 Claude 3.5 Sonnet
+              🤖 Claude Direct (needs proxy)
             </button>
             <button
               onClick={() => setConfig({
