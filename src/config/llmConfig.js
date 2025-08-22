@@ -31,7 +31,14 @@ export const LLM_CONFIG = {
     corsSupport: false // Depends on your server config
   },
 
-  // Add your specific configuration here
+  // Claude via local proxy (recommended for Claude API)
+  claude_proxy: {
+    baseUrl: 'http://localhost:3001/api/claude',
+    modelName: 'claude-3-5-sonnet-20241022',
+    apiKey: 'sk-ant-api03-your-real-claude-key-here', // Replace with your real Claude key
+    name: 'Claude via Local Proxy',
+    corsSupport: true
+  },
   custom: {
     baseUrl: 'http://apurl.com/v1', // Replace with your actual URL
     modelName: 'gpt-oss-120b',
@@ -42,7 +49,7 @@ export const LLM_CONFIG = {
 };
 
 // Default configuration to use
-export const DEFAULT_LLM_CONFIG = LLM_CONFIG.custom; // Using your server as default
+export const DEFAULT_LLM_CONFIG = LLM_CONFIG.claude_proxy; // Using Claude via proxy as default
 
 // Auto-configure based on environment or preference
 export const getAutoLLMConfig = () => {

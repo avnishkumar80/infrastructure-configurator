@@ -98,6 +98,13 @@ export const LLMConfig = () => {
           </p>
           <div className="flex flex-wrap gap-2">
             <button
+              onClick={() => handleUseEmbeddedConfig('claude_proxy')}
+              className="px-3 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 flex items-center space-x-1"
+            >
+              <span>🤖</span>
+              <span>Use Claude (Local Proxy)</span>
+            </button>
+            <button
               onClick={() => handleUseEmbeddedConfig('openrouter')}
               className="px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center space-x-1"
             >
