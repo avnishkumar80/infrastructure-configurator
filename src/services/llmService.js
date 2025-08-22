@@ -354,15 +354,32 @@ Generate a helpful response to the user based on their request and any tool resu
 
   async testConnection() {
     try {
-      const response = await this.callLLM([
-        { role: 'user', content: 'Hello, this is a connection test. Please respond with "Connection successful".' }
-      ], { max_tokens: 50 });
+      // Detect API type
+      const isClaudeAPI = this.baseUrl.includes('anthropic.com') || this.baseUrl.includes('/api/claude');
       
-      return {
-        success: true,
-        response: response,
-        config: this.getConfig()
-      };
+      if (isClaudeAPI) {
+        // Test Claude API
+        const response = await this.callClaudeAPI([
+          { role: 'user', content: 'Hello, this is a connection test. Please respond with "Connection successful".' }
+        ], { max_tokens: 50 });
+        
+        return {
+          success: true,
+          response: response,
+          config: this.getConfig()
+        };
+      } else {
+        // Test OpenAI-compatible API
+        const response = await this.callOpenAICompatibleAPI([
+          { role: 'user', content: 'Hello, this is a connection test. Please respond with "Connection successful".' }
+        ], { max_tokens: 50 });
+        
+        return {
+          success: true,
+          response: response,
+          config: this.getConfig()
+        };
+      }
     } catch (error) {
       return {
         success: false,
