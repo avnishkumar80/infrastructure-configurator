@@ -35,7 +35,7 @@ export const LLM_CONFIG = {
   claude_proxy: {
     baseUrl: 'http://localhost:3001/api/claude',
     modelName: 'claude-3-5-sonnet-20241022',
-    apiKey: 'sk-ant-api03-your-real-claude-key-here', // Replace with your real Claude key
+    apiKey: 'sk-ant-api03-PASTE-YOUR-REAL-CLAUDE-KEY-HERE', // Replace this with your actual Claude key
     name: 'Claude via Local Proxy',
     corsSupport: true
   },
