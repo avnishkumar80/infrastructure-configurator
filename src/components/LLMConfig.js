@@ -42,6 +42,8 @@ export const LLMConfig = () => {
       [field]: value
     }));
   };
+
+  const handleTestConnection = async () => {
     setIsTesting(true);
     setTestResult(null);
 
@@ -63,6 +65,7 @@ export const LLMConfig = () => {
     }
 
     setIsTesting(false);
+  };
   };
 
   const handleUseEmbeddedConfig = (configKey) => {
