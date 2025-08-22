@@ -66,7 +66,6 @@ export const LLMConfig = () => {
 
     setIsTesting(false);
   };
-  };
 
   const handleUseEmbeddedConfig = (configKey) => {
     const success = llmService.useEmbeddedConfig(configKey);
@@ -294,33 +293,13 @@ Access-Control-Allow-Headers: Content-Type, Authorization`}
       <div className="bg-blue-50 p-4 rounded-lg mt-6">
         <h3 className="font-semibold mb-2">📋 Setup Instructions</h3>
         <ol className="list-decimal list-inside space-y-1 text-sm">
-          <li>Enter your LLM API base URL (OpenAI-compatible format)</li>
+          <li>Use embedded configuration (click green buttons) for instant setup</li>
+          <li>Or enter your LLM API base URL (OpenAI-compatible format)</li>
           <li>Specify the model name you want to use</li>
           <li>Add your API key/token for authentication</li>
-          <li>Save the configuration</li>
-          <li>Test the connection to verify it works</li>
+          <li>Save the configuration and test the connection</li>
           <li>Once connected, the AI assistant will use LLM for intelligent responses</li>
         </ol>
-        
-        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
-          <h4 className="font-medium text-yellow-800">🔧 CORS Configuration Required</h4>
-          <div className="text-xs text-yellow-700 mt-1">
-            If you get CORS errors, add these headers to your LLM server:
-            <pre className="mt-1 text-xs bg-yellow-100 p-2 rounded overflow-auto">
-{`# For your LLM server, add CORS headers:
-Access-Control-Allow-Origin: ${window.location.origin}
-Access-Control-Allow-Methods: POST, OPTIONS
-Access-Control-Allow-Headers: Content-Type, Authorization, Accept
-
-# Example for Express.js:
-app.use(cors({
-  origin: '${window.location.origin}',
-  methods: ['POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
-}));`}
-            </pre>
-          </div>
-        </div>
         
         <div className="mt-3 text-xs text-gray-600">
           Configuration is saved locally in your browser
