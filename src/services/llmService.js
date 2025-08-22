@@ -149,33 +149,78 @@ Generate a helpful response to the user based on their request and any tool resu
       apiKey: this.apiKey
     };
 
-    // Use proxy server to avoid CORS issues
-    const proxyUrl = 'http://localhost:3001/api/claude/messages';
+    // Check if we're using the direct Anthropic API or need proxy
+    const isDirect = this.baseUrl.includes('api.anthropic.com');
     
-    console.log('🤖 Calling Claude API via proxy:', { 
-      url: proxyUrl,
-      model: this.modelName,
-      messageCount: messages.length 
-    });
-
-    try {
-      const response = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
+    if (isDirect) {
+      // Direct API call to Anthropic (will likely fail due to CORS)
+      console.log('🤖 Calling Claude API directly:', { 
+        url: `${this.baseUrl}/v1/messages`,
+        model: this.modelName,
+        messageCount: messages.length 
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Claude API error: ${response.status} - ${errorData.error || errorData.details || 'Unknown error'}`);
-      }
+      try {
+        const response = await fetch(`${this.baseUrl}/v1/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.apiKey,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: this.modelName,
+            max_tokens: options.max_tokens || 1000,
+            messages: messages,
+            temperature: options.temperature || 0.7
+          })
+        });
 
-      const data = await response.json();
-      return data.content[0].text;
-    } catch (error) {
-      this.handleAPIError(error);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(`Claude API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+        }
+
+        const data = await response.json();
+        return data.content[0].text;
+      } catch (error) {
+        if (error.message.includes('CORS')) {
+          throw new Error(`CORS Error: Claude API cannot be called directly from browser. Use OpenRouter or a proxy server instead.`);
+        }
+        throw error;
+      }
+    } else {
+      // Use proxy server for localhost:3001
+      const proxyUrl = 'http://localhost:3001/api/claude/messages';
+      
+      console.log('🤖 Calling Claude API via proxy:', { 
+        url: proxyUrl,
+        model: this.modelName,
+        messageCount: messages.length 
+      });
+
+      try {
+        const response = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Proxy error' }));
+          throw new Error(`Claude Proxy error: ${response.status} - ${errorData.error || errorData.details || 'Unknown error'}`);
+        }
+
+        const data = await response.json();
+        return data.content[0].text;
+      } catch (error) {
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error(`Proxy Error: Cannot reach proxy server at localhost:3001. Make sure the proxy server is running.`);
+        }
+        throw error;
+      }
     }
   }
 
