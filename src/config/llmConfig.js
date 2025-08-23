@@ -35,7 +35,7 @@ export const LLM_CONFIG = {
   claude_proxy: {
     baseUrl: 'http://localhost:3001/api/claude',
     modelName: 'claude-sonnet-4-20250514',
-    apiKey: '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', // Your actual Anthropic API key
+    apiKey: '', // Your actual Anthropic API key
     name: 'Claude via Local Proxy',
     corsSupport: true
   },
