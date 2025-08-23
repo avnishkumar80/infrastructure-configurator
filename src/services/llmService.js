@@ -130,8 +130,8 @@ Generate a helpful response to the user based on their request and any tool resu
   }
 
   async callLLM(messages, options = {}) {
-    // Detect if using Claude API
-    const isClaudeAPI = this.baseUrl.includes('anthropic.com');
+    // Detect if using Claude API (either direct or via proxy)
+    const isClaudeAPI = this.baseUrl.includes('anthropic.com') || this.baseUrl.includes('/api/claude');
     
     if (isClaudeAPI) {
       return await this.callClaudeAPI(messages, options);
