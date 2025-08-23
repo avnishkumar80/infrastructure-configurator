@@ -155,19 +155,36 @@ Generate a helpful response to the user based on their request and any tool resu
         apiKeyPreview: this.apiKey ? this.apiKey.substring(0, 12) + '...' + this.apiKey.substring(this.apiKey.length - 4) : 'NO API KEY'
       });
 
+      // Separate system message from regular messages (Claude format)
+      let systemMessage = '';
+      const claudeMessages = messages.filter(msg => {
+        if (msg.role === 'system') {
+          systemMessage = msg.content;
+          return false;
+        }
+        return true;
+      });
+
+      const requestBody = {
+        model: this.modelName,
+        max_tokens: options.max_tokens || 1000,
+        messages: claudeMessages,
+        temperature: options.temperature || 0.7,
+        apiKey: this.apiKey
+      };
+
+      // Add system message if present
+      if (systemMessage) {
+        requestBody.system = systemMessage;
+      }
+
       try {
         const response = await fetch(proxyUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            model: this.modelName,
-            max_tokens: options.max_tokens || 1000,
-            messages: messages,
-            temperature: options.temperature || 0.7,
-            apiKey: this.apiKey
-          })
+          body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {

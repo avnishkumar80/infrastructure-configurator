@@ -47,7 +47,7 @@ app.post('/api/claude/messages', async (req, res) => {
   try {
     console.log('🤖 Proxying request to Claude API...');
     
-    const { messages, model, max_tokens, temperature, apiKey } = req.body;
+    const { messages, model, max_tokens, temperature, system, apiKey } = req.body;
     console.log('🔍 Debug - API Key received:', apiKey ? `${apiKey.substring(0, 12)}...${apiKey.substring(apiKey.length - 4)}` : 'NO API KEY');
 
     // Validate required fields
@@ -72,6 +72,11 @@ app.post('/api/claude/messages', async (req, res) => {
       messages: messages,
       temperature: temperature || 0.7
     };
+
+    // Add system message if provided
+    if (system) {
+      claudeRequest.system = system;
+    }
 
     console.log(`📤 Sending to Claude: ${claudeRequest.model}, ${messages.length} messages`);
 
