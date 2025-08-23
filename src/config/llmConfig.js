@@ -35,7 +35,7 @@ export const LLM_CONFIG = {
   claude_proxy: {
     baseUrl: 'http://localhost:3001/api/claude',
     modelName: 'claude-sonnet-4-20250514',
-    apiKey: '', // Your actual Anthropic API key
+    apiKey: process.env.REACT_APP_CLAUDE_API_KEY || 'your-claude-api-key-here', // Set via environment variable
     name: 'Claude via Local Proxy',
     corsSupport: true
   },
