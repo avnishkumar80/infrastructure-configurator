@@ -48,6 +48,7 @@ app.post('/api/claude/messages', async (req, res) => {
     console.log('🤖 Proxying request to Claude API...');
     
     const { messages, model, max_tokens, temperature, apiKey } = req.body;
+    console.log('🔍 Debug - API Key received:', apiKey ? `${apiKey.substring(0, 12)}...${apiKey.substring(apiKey.length - 4)}` : 'NO API KEY');
 
     // Validate required fields
     if (!apiKey) {
@@ -66,7 +67,7 @@ app.post('/api/claude/messages', async (req, res) => {
 
     // Prepare request to Claude API
     const claudeRequest = {
-      model: model || 'claude-3-5-sonnet-20241022',
+      model: model || 'claude-sonnet-4-20250514',
       max_tokens: max_tokens || 1000,
       messages: messages,
       temperature: temperature || 0.7
@@ -157,7 +158,7 @@ app.post('/api/claude/test', async (req, res) => {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 50,
         messages: testMessages
       })
@@ -179,7 +180,7 @@ app.post('/api/claude/test', async (req, res) => {
       success: true,
       message: 'Claude API connection test successful',
       response: data.content[0].text,
-      model: 'claude-3-5-sonnet-20241022'
+      model: 'claude-sonnet-4-20250514'
     });
 
   } catch (error) {

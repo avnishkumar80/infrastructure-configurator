@@ -151,7 +151,8 @@ Generate a helpful response to the user based on their request and any tool resu
       console.log('🤖 Calling Claude API via local proxy:', { 
         url: proxyUrl,
         model: this.modelName,
-        messageCount: messages.length 
+        messageCount: messages.length,
+        apiKeyPreview: this.apiKey ? this.apiKey.substring(0, 12) + '...' + this.apiKey.substring(this.apiKey.length - 4) : 'NO API KEY'
       });
 
       try {
@@ -328,6 +329,7 @@ Generate a helpful response to the user based on their request and any tool resu
       this.apiKey = config.apiKey;
       this.isEmbeddedConfig = true;
       console.log(`🔄 Switched to embedded config: ${config.name}`);
+      console.log(`🔍 API Key set to: ${this.apiKey ? this.apiKey.substring(0, 12) + '...' + this.apiKey.substring(this.apiKey.length - 4) : 'NO KEY'}`);
       return true;
     }
     return false;

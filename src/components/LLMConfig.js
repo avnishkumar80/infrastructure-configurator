@@ -21,10 +21,36 @@ export const LLMConfig = () => {
     const savedConfig = localStorage.getItem('llm-config');
     if (savedConfig) {
       const parsed = JSON.parse(savedConfig);
-      setConfig(parsed);
-      llmService.setBaseUrl(parsed.baseUrl);
-      llmService.setModelName(parsed.modelName);
-      llmService.setApiKey(parsed.apiKey);
+      // Don't apply invalid API keys from localStorage
+      if (parsed.apiKey && parsed.apiKey !== '*** USING EMBEDDED KEY ***') {
+        setConfig(parsed);
+        llmService.setBaseUrl(parsed.baseUrl);
+        llmService.setModelName(parsed.modelName);
+        llmService.setApiKey(parsed.apiKey);
+      } else {
+        // Clear bad config and use default embedded config
+        localStorage.removeItem('llm-config');
+        const success = llmService.useEmbeddedConfig('claude_proxy');
+        if (success) {
+          const newConfig = llmService.getConfig();
+          setConfig({
+            baseUrl: newConfig.baseUrl,
+            modelName: newConfig.modelName,
+            apiKey: '*** USING EMBEDDED KEY ***'
+          });
+        }
+      }
+    } else {
+      // No saved config, use embedded config
+      const success = llmService.useEmbeddedConfig('claude_proxy');
+      if (success) {
+        const newConfig = llmService.getConfig();
+        setConfig({
+          baseUrl: newConfig.baseUrl,
+          modelName: newConfig.modelName,
+          apiKey: '*** USING EMBEDDED KEY ***'
+        });
+      }
     }
   }, []);
 
@@ -32,7 +58,10 @@ export const LLMConfig = () => {
     localStorage.setItem('llm-config', JSON.stringify(config));
     llmService.setBaseUrl(config.baseUrl);
     llmService.setModelName(config.modelName);
-    llmService.setApiKey(config.apiKey);
+    // Only set API key if it's not the placeholder
+    if (config.apiKey && config.apiKey !== '*** USING EMBEDDED KEY ***') {
+      llmService.setApiKey(config.apiKey);
+    }
     alert('LLM configuration saved!');
   };
 
@@ -47,10 +76,14 @@ export const LLMConfig = () => {
     setIsTesting(true);
     setTestResult(null);
 
-    // Apply current config
+    // Apply current config, but don't overwrite embedded API keys
     llmService.setBaseUrl(config.baseUrl);
     llmService.setModelName(config.modelName);
-    llmService.setApiKey(config.apiKey);
+    // Only set API key if it's not the placeholder
+    if (config.apiKey && config.apiKey !== '*** USING EMBEDDED KEY ***') {
+      llmService.setApiKey(config.apiKey);
+    }
+    // If using embedded config, the real API key is already set by useEmbeddedConfig
 
     try {
       const result = await llmService.testConnection();
@@ -71,10 +104,12 @@ export const LLMConfig = () => {
     const success = llmService.useEmbeddedConfig(configKey);
     if (success) {
       const newConfig = llmService.getConfig();
+      // Get the actual config to access the real API key
+      const actualConfig = llmService.getConfig();
       setConfig({
         baseUrl: newConfig.baseUrl,
         modelName: newConfig.modelName,
-        apiKey: '*** USING EMBEDDED KEY ***'
+        apiKey: newConfig.hasApiKey ? '*** USING EMBEDDED KEY ***' : ''  // Keep placeholder for display, but service has real key
       });
       alert(`Switched to embedded configuration: ${configKey}`);
     }

@@ -34,8 +34,8 @@ export const LLM_CONFIG = {
   // Claude via local proxy (recommended for Claude API)
   claude_proxy: {
     baseUrl: 'http://localhost:3001/api/claude',
-    modelName: 'claude-3-5-sonnet-20241022',
-    apiKey: 'sk-ant-api03-PASTE-YOUR-REAL-CLAUDE-KEY-HERE', // Replace this with your actual Claude key
+    modelName: 'claude-sonnet-4-20250514',
+    apiKey: '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', // Your actual Anthropic API key
     name: 'Claude via Local Proxy',
     corsSupport: true
   },
@@ -49,7 +49,7 @@ export const LLM_CONFIG = {
 };
 
 // Default configuration to use
-export const DEFAULT_LLM_CONFIG = LLM_CONFIG.claude_proxy; // Using Claude via proxy as default
+export const DEFAULT_LLM_CONFIG = LLM_CONFIG.claude_proxy; // Using Claude proxy for direct API access
 
 // Auto-configure based on environment or preference
 export const getAutoLLMConfig = () => {
