@@ -1,3 +1,46 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Chat sidebar positioning to account for sticky header */
+.chat-sidebar-container {
+  top: 100px;
+  height: calc(100vh - 100px);
+}
+
+/* Ensure chat container adapts to available space */
+.chat-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Remove all default textarea styling and focus indicators */
+textarea {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+}
+
+textarea:focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  ring: none !important;
+  -webkit-box-shadow: none !important;
+  -moz-box-shadow: none !important;
+}
+
+/* Ensure no browser default styling interferes */
+*:focus {
+  outline: none !important;
+}
+
+/* Custom focus handling for the input container */
+.input-container-focus {
+  border-color: rgb(147 197 253);
+  box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.1), 0 4px 6px -2px rgba(59, 130, 246, 0.05);
+}

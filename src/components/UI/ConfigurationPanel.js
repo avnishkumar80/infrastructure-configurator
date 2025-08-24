@@ -6,11 +6,13 @@ import {
   Download, 
   Bot, 
   Trash2,
-  Settings,
-  ChevronDown
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { useFileHandling } from '../../hooks/useFileHandling.js';
-import { useUI } from '../../store/UIContext.js';
+import { useMCPIntegration } from '../../hooks/useMCPIntegration.js';
+import { useLLMConnection } from '../../hooks/useLLMConnection.js';
+import LLMConnectionBadge from './LLMConnectionBadge.js';
 
 /**
  * ConfigurationPanel Component
@@ -31,6 +33,10 @@ const ConfigurationPanel = ({
     handleFileInputChange, 
     handleResetToDefault 
   } = useFileHandling();
+
+  // Get MCP and LLM connection status
+  const { isConnected: mcpConnected, availableTools, connectionError: mcpError } = useMCPIntegration();
+  const { isConnected: llmConnected, isConnecting: llmConnecting, connectionError: llmError, llmConfig } = useLLMConnection();
 
   if (!isVisible) return null;
 
@@ -71,8 +77,54 @@ const ConfigurationPanel = ({
         )}
 
         <div className="space-y-3">
-          {/* Import/Export Section */}
+          {/* Connection Status Section */}
           <div className="space-y-2">
+            <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+              Connection Status
+            </label>
+            
+            <div className="space-y-2">
+              {/* MCP Connection Status */}
+              <div className={`flex items-center justify-between px-3 py-2 rounded-lg border ${
+                mcpConnected 
+                  ? 'bg-green-50 border-green-200' 
+                  : mcpError 
+                  ? 'bg-red-50 border-red-200' 
+                  : 'bg-gray-50 border-gray-200'
+              }`}>
+                <div className="flex items-center space-x-2">
+                  <Wifi className={`w-4 h-4 ${
+                    mcpConnected ? 'text-green-600' : 'text-gray-400'
+                  }`} />
+                  <span className="text-sm font-medium">MCP Tools</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {mcpConnected ? (
+                    <>
+                      <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded">
+                        {availableTools.length} tools
+                      </span>
+                      <Check className="w-4 h-4 text-green-600" />
+                    </>
+                  ) : (
+                    <WifiOff className="w-4 h-4 text-gray-400" />
+                  )}
+                </div>
+              </div>
+
+              {/* LLM Connection Status */}
+              <LLMConnectionBadge 
+                isConnected={llmConnected}
+                isConnecting={llmConnecting}
+                error={llmError}
+                config={llmConfig}
+                size="md"
+                className="w-full justify-between px-3 py-2 rounded-lg border"
+              />
+            </div>
+          </div>
+          {/* Import/Export Section */}
+          <div className="space-y-2 border-t border-gray-200 pt-3">
             <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
               Import/Export
             </label>

@@ -55,9 +55,9 @@ const ConfiguratorLayout = () => {
           </div>
         </div>
 
-        {/* AI Assistant Sidebar */}
+        {/* AI Assistant Sidebar - positioned below header */}
         {isChatVisible && (
-          <div className="fixed top-0 right-0 h-full z-30">
+          <div className="fixed right-0 z-30 chat-sidebar-container">
             <AIConfigurationAssistant />
           </div>
         )}

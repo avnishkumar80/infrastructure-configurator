@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useConfiguration } from '../store/ConfigurationContext.js';
 import { useUI } from '../store/UIContext.js';
 import { useMCPIntegration } from './useMCPIntegration.js';
+import { useLLMConnection } from './useLLMConnection.js';
 import enhancedAiService from '../services/enhancedAiService.js';
 
 /**
@@ -17,22 +18,152 @@ export const useEnhancedAIAssistant = () => {
   const { configData, configuration } = useConfiguration();
   const { currentStep } = useUI();
   const { isConnected, availableTools, callTool, connectionError } = useMCPIntegration();
+  const { isConnected: llmConnected } = useLLMConnection();
 
-  // Initialize with welcome message based on MCP status
-  useEffect(() => {
-    const welcomeMessage = {
-      id: Date.now(),
-      type: 'assistant',
-      content: isConnected 
-        ? "👋 **Hi! I'm your AI Configuration Assistant**\n\n🛠️ **MCP Tools Connected** - I can now provide real assistance!\n\nI have access to your team's tools and can:\n• Validate your configurations\n• Fix configuration errors\n• Generate deployment scripts\n• Optimize your infrastructure\n• And much more!\n\nTry asking: *'Validate my current configuration'* or *'Help me optimize my setup'*"
-        : "👋 **Hi! I'm your AI Configuration Assistant**\n\n⚠️ **Basic Mode** - MCP tools are currently unavailable\n\nI can still help with:\n• General configuration guidance\n• Best practices advice\n• Basic troubleshooting\n• Configuration suggestions\n\nFor enhanced capabilities, please ensure the MCP server is running.",
-      timestamp: new Date(),
-      mcpStatus: isConnected ? 'connected' : 'disconnected',
-      connectionError: connectionError
+  // Generate dynamic welcome message based on available MCP tools
+  const generateWelcomeMessage = useCallback(async () => {
+    if (!isConnected || availableTools.length === 0) {
+      return {
+        id: Date.now(),
+        type: 'assistant',
+        content: "👋 **Hi! I'm your AI Configuration Assistant**\n\n⚠️ **Basic Mode** - MCP tools are currently unavailable\n\nI can still help with:\n• General configuration guidance\n• Best practices advice\n• Basic troubleshooting\n• Configuration suggestions\n\nFor enhanced capabilities, please ensure the MCP server is running.",
+        timestamp: new Date(),
+        mcpStatus: 'disconnected',
+        connectionError: connectionError
+      };
+    }
+
+    // If both MCP and LLM are connected, use LLM to generate intelligent welcome message
+    if (llmConnected) {
+      try {
+        console.log('🧠 Generating intelligent welcome message with LLM...');
+        const welcomeContext = {
+          availableTools: availableTools.map(t => ({ name: t.name, description: t.description })),
+          toolCount: availableTools.length,
+          currentStep,
+          configuration,
+          configData
+        };
+        
+        // Use LLM service to generate a personalized welcome message
+        const aiResult = await enhancedAiService.processUserMessage(
+          "Generate a welcome message that shows what you can do with the available MCP tools. Be specific about capabilities and provide 2-3 example queries the user can try.",
+          welcomeContext
+        );
+        
+        return {
+          id: Date.now(),
+          type: 'assistant',
+          content: aiResult.response.content,
+          timestamp: new Date(),
+          mcpStatus: 'connected',
+          llmPowered: true,
+          availableToolsCount: availableTools.length,
+          responseType: aiResult.response.type,
+          analysis: aiResult.analysis
+        };
+      } catch (error) {
+        console.error('❌ Failed to generate LLM welcome message:', error);
+        // Fallback to dynamic tool-based message
+      }
+    }
+
+    // Fallback: Generate tool categories for manual welcome message
+    const toolCategories = {
+      math: availableTools.filter(t => t.name.includes('add') || t.description?.toLowerCase().includes('math') || t.description?.toLowerCase().includes('calculate')),
+      recommendation: availableTools.filter(t => t.name.includes('recommend') || t.description?.toLowerCase().includes('recommend')),
+      personal: availableTools.filter(t => t.name.includes('wife') || t.name.includes('personal') || t.description?.toLowerCase().includes('personal')),
+      system: availableTools.filter(t => t.name.includes('desktop') || t.name.includes('system') || t.description?.toLowerCase().includes('desktop') || t.description?.toLowerCase().includes('system')),
+      other: []
     };
 
-    setMessages([welcomeMessage]);
-  }, [isConnected, connectionError]);
+    // Put uncategorized tools in "other"
+    toolCategories.other = availableTools.filter(tool => 
+      !toolCategories.math.includes(tool) && 
+      !toolCategories.recommendation.includes(tool) && 
+      !toolCategories.personal.includes(tool) && 
+      !toolCategories.system.includes(tool)
+    );
+
+    let toolsDescription = "";
+    let capabilities = [];
+
+    if (toolCategories.math.length > 0) {
+      capabilities.push("• **Math & Calculations** - Perform arithmetic and mathematical operations");
+    }
+    if (toolCategories.recommendation.length > 0) {
+      capabilities.push("• **Smart Recommendations** - Get personalized suggestions and advice");
+    }
+    if (toolCategories.system.length > 0) {
+      capabilities.push("• **System Management** - Access desktop and file system operations");
+    }
+    if (toolCategories.personal.length > 0) {
+      capabilities.push("• **Personal Assistance** - Help with personal information and queries");
+    }
+    if (toolCategories.other.length > 0) {
+      capabilities.push(`• **Additional Tools** - ${toolCategories.other.length} specialized tools available`);
+    }
+
+    // Generate tool summary
+    toolsDescription = `🛠️ **${availableTools.length} MCP Tools Connected!**\n\nAvailable capabilities:\n${capabilities.join('\n')}`;
+
+    // Generate suggested actions based on available tools
+    let suggestions = [];
+    if (toolCategories.math.length > 0) {
+      suggestions.push("*'Calculate 123 + 456'*");
+    }
+    if (toolCategories.recommendation.length > 0) {
+      suggestions.push("*'Give me a recommendation'*");
+    }
+    if (toolCategories.system.length > 0) {
+      suggestions.push("*'Help me with file management'*");
+    }
+
+    const suggestionsText = suggestions.length > 0 ? 
+      `\n\nTry asking: ${suggestions.slice(0, 2).join(' or ')}` : 
+      "\n\nAsk me anything - I'll use the available tools to help!";
+
+    return {
+      id: Date.now(),
+      type: 'assistant',
+      content: `👋 **Welcome to your AI Configuration Assistant**\n\n${toolsDescription}${suggestionsText}`,
+      timestamp: new Date(),
+      mcpStatus: 'connected',
+      availableToolsCount: availableTools.length,
+      toolCategories: Object.keys(toolCategories).filter(cat => toolCategories[cat].length > 0)
+    };
+  }, [isConnected, availableTools, connectionError, currentStep, configuration, configData, llmConnected]);
+
+  // Initialize with welcome message based on MCP status and available tools
+  useEffect(() => {
+    const initializeWelcomeMessage = async () => {
+      try {
+        console.log('🚀 Initializing welcome message...', { 
+          isConnected, 
+          llmConnected, 
+          toolCount: availableTools.length 
+        });
+        const welcomeMessage = await generateWelcomeMessage();
+        console.log('✅ Generated welcome message:', welcomeMessage.content.substring(0, 100) + '...');
+        setMessages([welcomeMessage]);
+      } catch (error) {
+        console.error('❌ Failed to generate welcome message:', error);
+        // Only fallback if everything else fails
+        const fallbackMessage = {
+          id: Date.now(),
+          type: 'assistant',
+          content: "👋 **Welcome!**\n\nI'm your AI Configuration Assistant. How can I help you today?",
+          timestamp: new Date(),
+          mcpStatus: isConnected ? 'connected' : 'disconnected',
+          isError: true,
+          connectionError: error.message
+        };
+        setMessages([fallbackMessage]);
+      }
+    };
+
+    initializeWelcomeMessage();
+  }, [generateWelcomeMessage, isConnected, llmConnected, availableTools.length]);
 
   // Enhanced message sending with MCP integration
   const handleSendMessage = useCallback(async () => {
@@ -58,11 +189,22 @@ export const useEnhancedAIAssistant = () => {
         configData,
         hasErrors: false, // You could calculate this from validation
         availableTools,
-        isConnected
+        isConnected,
+        llmConnected
       };
+
+      console.log('🧠 Processing message with context:', { 
+        message: currentInput, 
+        mcpConnected: isConnected, 
+        llmConnected, 
+        toolCount: availableTools.length,
+        context: currentContext 
+      });
 
       // Process message with enhanced AI service
       const aiResult = await enhancedAiService.processUserMessage(currentInput, currentContext);
+      
+      console.log('🤖 AI Service result:', aiResult);
       
       const assistantMessage = {
         id: Date.now() + 1,
@@ -74,7 +216,8 @@ export const useEnhancedAIAssistant = () => {
         analysis: aiResult.analysis,
         needsConfirmation: aiResult.response.needsConfirmation,
         suggestedTool: aiResult.response.suggestedTool,
-        mcpPowered: isConnected
+        mcpPowered: isConnected,
+        llmPowered: llmConnected
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -101,7 +244,7 @@ export const useEnhancedAIAssistant = () => {
     } finally {
       setIsTyping(false);
     }
-  }, [inputMessage, isTyping, currentStep, configuration, configData, isConnected, availableTools]);
+  }, [inputMessage, isTyping, currentStep, configuration, configData, isConnected, llmConnected, availableTools]);
 
   // Handle tool execution confirmation
   const handleConfirmToolExecution = useCallback(async (toolName, parameters = {}) => {
@@ -182,18 +325,22 @@ export const useEnhancedAIAssistant = () => {
   }, [handleSendMessage]);
 
   // Clear chat
-  const clearChat = useCallback(() => {
-    const welcomeMessage = {
-      id: Date.now(),
-      type: 'assistant',
-      content: isConnected 
-        ? "👋 Chat cleared! How can I help you with your infrastructure configuration?"
-        : "👋 Chat cleared! I'm in basic mode - MCP tools are unavailable. How can I help you?",
-      timestamp: new Date(),
-      mcpStatus: isConnected ? 'connected' : 'disconnected'
-    };
-    setMessages([welcomeMessage]);
-  }, [isConnected]);
+  const clearChat = useCallback(async () => {
+    try {
+      const welcomeMessage = await generateWelcomeMessage();
+      setMessages([welcomeMessage]);
+    } catch (error) {
+      console.error('Failed to generate welcome message on clear:', error);
+      const fallbackMessage = {
+        id: Date.now(),
+        type: 'assistant',
+        content: "👋 Chat cleared! How can I help you?",
+        timestamp: new Date(),
+        mcpStatus: isConnected ? 'connected' : 'disconnected'
+      };
+      setMessages([fallbackMessage]);
+    }
+  }, [generateWelcomeMessage, isConnected]);
 
   return {
     // State

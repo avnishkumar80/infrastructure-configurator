@@ -2,12 +2,16 @@ import React from 'react';
 import { 
   Settings, 
   ChevronDown, 
-  MessageCircle 
+  MessageCircle,
+  Wifi
 } from 'lucide-react';
 import ConfigurationPanel from '../UI/ConfigurationPanel.js';
+import LLMConnectionBadge from '../UI/LLMConnectionBadge.js';
 import { useConfigurationState } from '../../hooks/useConfiguration.js';
 import { useValidation } from '../../hooks/useConfiguration.js';
 import { useUI } from '../../store/UIContext.js';
+import { useMCPIntegration } from '../../hooks/useMCPIntegration.js';
+import { useLLMConnection } from '../../hooks/useLLMConnection.js';
 import { formatPrice } from '../../utils/priceCalculator.js';
 
 /**
@@ -27,6 +31,10 @@ const ConfiguratorHeader = () => {
     uploadSuccess,
     isConfigLoading
   } = useUI();
+
+  // Get connection status
+  const { isConnected: mcpConnected, availableTools } = useMCPIntegration();
+  const { isConnected: llmConnected, isConnecting: llmConnecting, connectionError: llmError, llmConfig } = useLLMConnection();
 
   const renderMessageButton = () => {
     if (messageCounts.total === 0) return null;
@@ -71,20 +79,46 @@ const ConfiguratorHeader = () => {
           </div>
           
           {/* Controls */}
-          <div className="flex items-center space-x-6">
-            {/* Base Price */}
-            <div className="text-center">
-              <div className="text-xs text-gray-500 uppercase tracking-wide">Base Price</div>
-              <div className="text-sm font-semibold text-blue-600">
-                {formatPrice(configData.productInfo?.salesPrice || 0)}
-              </div>
+          <div className="flex items-center space-x-4">
+            {/* Connection Status Badges */}
+            <div className="flex items-center space-x-2">
+              {/* MCP Status */}
+              {mcpConnected && (
+                <div className="flex items-center space-x-1 text-xs bg-green-50 text-green-700 px-2 py-1 rounded-full border border-green-200">
+                  <Wifi className="w-3 h-3" />
+                  <span>MCP</span>
+                  <span className="bg-green-100 px-1 py-0.5 rounded text-xs">
+                    {availableTools.length}
+                  </span>
+                </div>
+              )}
+              
+              {/* LLM Status */}
+              <LLMConnectionBadge 
+                isConnected={llmConnected}
+                isConnecting={llmConnecting}
+                error={llmError}
+                config={llmConfig}
+                size="xs"
+              />
             </div>
-            
-            {/* Total Price */}
-            <div className="text-center">
-              <div className="text-xs text-gray-500 uppercase tracking-wide">Total Price</div>
-              <div className="text-lg font-bold text-green-600">
-                {formatPrice(totalPrice)}
+
+            {/* Price Section */}
+            <div className="flex items-center space-x-4">
+              {/* Base Price */}
+              <div className="text-center">
+                <div className="text-xs text-gray-500 uppercase tracking-wide">Base Price</div>
+                <div className="text-sm font-semibold text-blue-600">
+                  {formatPrice(configData.productInfo?.salesPrice || 0)}
+                </div>
+              </div>
+              
+              {/* Total Price */}
+              <div className="text-center">
+                <div className="text-xs text-gray-500 uppercase tracking-wide">Total Price</div>
+                <div className="text-lg font-bold text-green-600">
+                  {formatPrice(totalPrice)}
+                </div>
               </div>
             </div>
 
