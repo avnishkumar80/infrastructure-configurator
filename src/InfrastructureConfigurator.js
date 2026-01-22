@@ -32,7 +32,20 @@ const InfrastructureConfigurator = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isIntentModalOpen, setIsIntentModalOpen] = React.useState(false);
 
+  // Check if configuration has any items
+  const hasActiveConfig = React.useMemo(() => {
+    return Object.values(configuration).some(category =>
+      Object.values(category).some(subItem =>
+        subItem.selections && subItem.selections.length > 0
+      )
+    );
+  }, [configuration]);
+
   const handleIntentSelect = (intentId) => {
+    // If hasActiveConfig and intent is changing, we assume user confirmed via modal UI
+    if (userIntent && hasActiveConfig && JSON.stringify(userIntent) !== JSON.stringify(intentId)) {
+      resetToDefault();
+    }
     setUserIntent(intentId);
     setIsIntentModalOpen(false);
   };
@@ -71,10 +84,11 @@ const InfrastructureConfigurator = () => {
     <div className="min-h-screen bg-slate-50 flex flex-col h-screen overflow-hidden font-sans">
       {(!userIntent || isIntentModalOpen) && (
         <IntentSelector
-          intents={configData.intents}
+          intentQuestions={configData.intentQuestions}
           currentIntent={userIntent}
           onSelect={handleIntentSelect}
           onClose={userIntent ? () => setIsIntentModalOpen(false) : undefined}
+          hasActiveConfig={hasActiveConfig}
         />
       )}
 

@@ -60,9 +60,18 @@ const Header = ({
 
     // Find current intent label
     const currentIntentLabel = useMemo(() => {
-        if (!userIntent || !configData.intents) return null;
-        return configData.intents.find(i => i.id === userIntent)?.label;
-    }, [userIntent, configData.intents]);
+        if (!userIntent || !configData.intentQuestions) return null;
+
+        // If userIntent is object, map keys to labels
+        return Object.entries(userIntent)
+            .map(([key, value]) => {
+                const question = configData.intentQuestions.find(q => q.id === key);
+                const option = question?.options.find(o => o.value === value);
+                return option?.label;
+            })
+            .filter(Boolean)
+            .join(' | ');
+    }, [userIntent, configData.intentQuestions]);
 
     return (
         <div className="bg-white border-b shadow-sm sticky top-0 z-30">

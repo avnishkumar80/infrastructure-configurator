@@ -13,13 +13,21 @@ const ProductSelector = ({
     setSelectedProductIndex,
     userIntent
 }) => {
-    // Filter products based on intent if set
+    // Filter products based on intent tags if set
     const availableProducts = React.useMemo(() => {
         const products = configData.products[subItem] || [];
-        if (!userIntent) return products;
+        if (!userIntent || Object.keys(userIntent).length === 0) return products;
+
         return products.filter(product => {
-            // If product has no recommended tag, show it. If it has tags, must match intent.
-            return !product.recommendedFor || product.recommendedFor.includes(userIntent);
+            if (!product.tags) return true;
+
+            // Check each intent answer against product tags
+            return Object.entries(userIntent).every(([questionId, answer]) => {
+                // If product doesn't have a tag for this question, it's compatible
+                if (!product.tags[questionId]) return true;
+                // If it does, the answer must be in the allowed values
+                return product.tags[questionId].includes(answer);
+            });
         });
     }, [configData.products, subItem, userIntent]);
 
@@ -54,9 +62,9 @@ const ProductSelector = ({
         }
     };
 
-    // Helper to check recommendation
+    // Helper to check recommendation (disabled for now as options lack tags)
     const isRecommended = (item) => {
-        return userIntent && item.recommendedFor && item.recommendedFor.includes(userIntent);
+        return false;
     };
 
     // Configuration mode for specific product
@@ -83,9 +91,18 @@ const ProductSelector = ({
                                 <h3 className="text-xl font-bold text-gray-900">{selection.product.name}</h3>
                                 <p className="text-gray-500 mt-1">{selection.product.description}</p>
                             </div>
-                            {userIntent && (
+                            {userIntent && Object.keys(userIntent).length > 0 && (
                                 <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium capitalize">
-                                    Option Filter: {configData.intents?.find(i => i.id === userIntent)?.label}
+                                    Filter: {
+                                        Object.entries(userIntent)
+                                            .map(([key, value]) => {
+                                                const question = configData.intentQuestions?.find(q => q.id === key);
+                                                const option = question?.options.find(o => o.value === value);
+                                                return option?.label;
+                                            })
+                                            .filter(Boolean)
+                                            .join(' | ')
+                                    }
                                 </span>
                             )}
                         </div>
@@ -351,9 +368,18 @@ const ProductSelector = ({
             <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                     {currentSelections.length > 0 ? 'Add More Products' : 'Available Products'}
-                    {userIntent && (
+                    {userIntent && Object.keys(userIntent).length > 0 && (
                         <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                            Filtered for: {configData.intents?.find(i => i.id === userIntent)?.label}
+                            Filtered for: {
+                                Object.entries(userIntent)
+                                    .map(([key, value]) => {
+                                        const question = configData.intentQuestions?.find(q => q.id === key);
+                                        const option = question?.options.find(o => o.value === value);
+                                        return option?.label;
+                                    })
+                                    .filter(Boolean)
+                                    .join(' | ')
+                            }
                         </span>
                     )}
                 </h3>
