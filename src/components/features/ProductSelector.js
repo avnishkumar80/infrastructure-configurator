@@ -11,7 +11,9 @@ const ProductSelector = ({
     updateConfiguration,
     selectedProductIndex,
     setSelectedProductIndex,
-    userIntent
+    userIntent,
+    intentQuestions,
+    onIntentSelect
 }) => {
     // Filter products based on intent tags if set
     const availableProducts = React.useMemo(() => {
@@ -315,6 +317,7 @@ const ProductSelector = ({
             </div>
         );
     }
+
 
     // Product overview mode
     return (
