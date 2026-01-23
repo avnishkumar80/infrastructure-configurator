@@ -82,12 +82,12 @@ const InfrastructureConfigurator = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col h-screen overflow-hidden font-sans">
-      {(!userIntent || isIntentModalOpen) && (
+      {isIntentModalOpen && (
         <IntentSelector
           intentQuestions={configData.intentQuestions}
           currentIntent={userIntent}
           onSelect={handleIntentSelect}
-          onClose={userIntent ? () => setIsIntentModalOpen(false) : undefined}
+          onClose={() => setIsIntentModalOpen(false)}
           hasActiveConfig={hasActiveConfig}
         />
       )}
@@ -134,7 +134,24 @@ const InfrastructureConfigurator = () => {
         <div className="flex-1 bg-slate-50 overflow-y-auto w-full">
           <div className="p-4 md:p-6 pb-24 max-w-7xl mx-auto">
             <div className="max-w-none">
-              {currentStep === 'review' ? (
+              {currentStep === 'hardware' && currentSubItem === 'config-context' ? (
+                <div className="max-w-3xl mx-auto py-8">
+                  <IntentSelector
+                    intentQuestions={configData.intentQuestions}
+                    currentIntent={userIntent}
+                    onSelect={(answers) => {
+                      handleIntentSelect(answers);
+                      // Auto-advance to next step if not just changing filters
+                      if (!hasActiveConfig) {
+                        setCurrentSubItem('server-nodes');
+                      }
+                    }}
+                    variant="embedded"
+                    hasActiveConfig={hasActiveConfig}
+                    submitLabel={hasActiveConfig ? undefined : "Next: Server Nodes"}
+                  />
+                </div>
+              ) : currentStep === 'review' ? (
                 <Summary
                   configData={configData}
                   configuration={configuration}
@@ -149,6 +166,8 @@ const InfrastructureConfigurator = () => {
                   selectedProductIndex={selectedProductIndex}
                   setSelectedProductIndex={setSelectedProductIndex}
                   userIntent={userIntent}
+                  intentQuestions={configData.intentQuestions}
+                  onIntentSelect={handleIntentSelect}
                 />
               )}
             </div>

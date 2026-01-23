@@ -30,7 +30,9 @@ export const defaultConfigData = {
         { id: 'review', label: 'Review' }
     ],
     subItems: {
+        context: [],
         hardware: [
+            { id: 'config-context', label: 'Configuration Context' },
             { id: 'server-nodes', label: 'Server Nodes' },
             { id: 'enclosures', label: 'Enclosures' },
             { id: 'storage', label: 'Storage Units' },
